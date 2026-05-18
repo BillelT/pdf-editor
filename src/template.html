@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Éditeur PDF — 100% local</title>
+<style>
+/*__STYLES__*/
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="tb-group">
+    <button class="btn primary" id="openBtn" title="Ouvrir un PDF">📂 Ouvrir</button>
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" class="hidden">
+  </div>
+
+  <div class="tb-group">
+    <button class="btn tool active" data-tool="select" title="Sélectionner / déplacer">↖ Sélection</button>
+    <button class="btn tool" data-tool="text" title="Ajouter du texte">T Texte</button>
+    <button class="btn tool" data-tool="draw" title="Dessin libre">✎ Dessin</button>
+    <button class="btn tool" data-tool="check" title="Cocher une case (double-clic = ✔/✗)">✔ Coche</button>
+    <button class="btn tool" data-tool="erase" title="Gomme">⌫ Gomme</button>
+  </div>
+
+  <div class="tb-group">
+    <span class="tb-label">Couleur</span>
+    <input type="color" id="colorIn" value="#e23b3b">
+    <span class="tb-label">Trait</span>
+    <input type="range" id="strokeIn" min="1" max="20" step="1" value="3">
+    <span class="tb-label" id="strokeVal">3</span>
+    <span class="tb-label">Police</span>
+    <select class="field" id="fontIn" title="Taille du texte">
+      <option>10</option><option>12</option><option>14</option>
+      <option selected>16</option><option>18</option><option>20</option>
+      <option>24</option><option>28</option><option>32</option><option>48</option>
+    </select>
+  </div>
+
+  <div class="tb-group">
+    <button class="btn" id="undoBtn" title="Annuler (Cmd/Ctrl+Z)" disabled>↶</button>
+    <button class="btn" id="redoBtn" title="Rétablir (Cmd/Ctrl+Shift+Z)" disabled>↷</button>
+    <button class="btn" id="clearBtn" title="Tout effacer" disabled>🗑 Tout</button>
+  </div>
+
+  <div class="tb-group">
+    <button class="btn" id="zoomOut" title="Zoom −">−</button>
+    <span id="zoomLabel">125%</span>
+    <button class="btn" id="zoomIn" title="Zoom +">+</button>
+    <button class="btn" id="zoomReset" title="Réinitialiser le zoom">⤢</button>
+  </div>
+
+  <div class="tb-group" style="margin-left:auto;border:none">
+    <button class="btn primary" id="exportBtn" title="Télécharger le PDF (Cmd/Ctrl+S)" disabled>⬇ Exporter</button>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="empty">
+    <h2>Éditeur PDF — 100% local</h2>
+    <p>Aucune donnée ne quitte votre ordinateur. Glissez un PDF ici ou&nbsp;:</p>
+    <button class="btn primary" id="openBtn2">📂 Choisir un fichier PDF</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="busy" class="hidden"></div>
+
+<script>
+/*__PDFLIB__*/
+</script>
+<script>
+/*__PDFJS__*/
+</script>
+<script>
+window.__PDFJS_WORKER_BLOB_URL__ = (function () {
+  try {
+    var b64 = "/*__WORKER_B64__*/";
+    var bin = atob(b64);
+    var len = bin.length;
+    var arr = new Uint8Array(len);
+    for (var i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+    var blob = new Blob([arr], { type: "text/javascript" });
+    return URL.createObjectURL(blob);
+  } catch (e) { return null; }
+})();
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>
