@@ -249,6 +249,7 @@
     d.className = "del-handle";
     d.textContent = "×";
     d.title = "Supprimer";
+    d.setAttribute("contenteditable", "false");
     d.addEventListener("mousedown", function (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -267,21 +268,27 @@
     el.style.top = (a.y * P.cssH) + "px";
     el.style.color = a.color;
     el.style.fontSize = (a.size * state.scale) + "px";
-    el.textContent = a.text || "";
-    if (state.selected === a.id) el.classList.add("selected");
+
+    // The editable text lives in its own child so the delete handle
+    // is never part of textContent (it used to leak a "×" into the
+    // saved text) and is never itself editable.
+    var tx = document.createElement("div");
+    tx.className = "tx";
+    tx.textContent = a.text || "";
+    el.appendChild(tx);
     el.appendChild(delHandle(a));
 
-    enableDrag(el, P, a, function () {
-      // double-click or text-tool click → edit
-    });
+    if (state.selected === a.id) el.classList.add("selected");
+
+    enableDrag(el, P, a);
 
     el.addEventListener("dblclick", function (e) {
       e.stopPropagation();
-      startEditText(el, P, a);
+      startEditText(tx, a);
     });
-    el.addEventListener("blur", function () {
-      el.contentEditable = "false";
-      var txt = el.textContent.replace(/ /g, " ");
+    tx.addEventListener("blur", function () {
+      tx.contentEditable = "false";
+      var txt = tx.textContent.replace(/ /g, " ");
       if (!txt.trim()) {
         removeAnno(a.id);
         el.remove();
@@ -292,16 +299,16 @@
     return el;
   }
 
-  function startEditText(el, P, a) {
+  function startEditText(node, a) {
     select(a.id);
-    el.contentEditable = "true";
+    node.contentEditable = "true";
     // Defer focus to the next tick so the browser's default mousedown
     // focus handling can't steal it back (which used to blank/remove
     // a freshly placed text box).
     setTimeout(function () {
-      el.focus();
+      node.focus();
       var r = document.createRange();
-      r.selectNodeContents(el);
+      r.selectNodeContents(node);
       r.collapse(false);
       var sel = window.getSelection();
       sel.removeAllRanges();
@@ -349,7 +356,7 @@
   // ---------- Dragging ----------
   function enableDrag(el, P, a) {
     el.addEventListener("mousedown", function (e) {
-      if (el.contentEditable === "true") return; // editing text
+      if (el.querySelector('[contenteditable="true"]')) return; // editing text
       e.stopPropagation();
       e.preventDefault(); // avoid focus-steal / page text selection while dragging
 
@@ -360,7 +367,7 @@
       }
       select(a.id);
       if (state.tool === "text" && a.type === "text") {
-        startEditText(el, P, a);
+        startEditText(el.querySelector(".tx"), a);
         return;
       }
       if (state.tool !== "select") return;
@@ -432,7 +439,7 @@
         });
         var el = buildTextEl(P, a);
         P.overlay.appendChild(el);
-        startEditText(el, P, a);
+        startEditText(el.querySelector(".tx"), a);
         return;
       }
 

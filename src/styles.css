@@ -160,14 +160,18 @@ canvas.draw {
 
 .anno.text {
   min-width: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  outline: none;
   cursor: move;
   line-height: 1.2;
 }
-.anno.text[contenteditable="true"] { cursor: text; }
-.anno.text:empty::before {
+.anno.text .tx {
+  display: block;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-width: 12px;
+}
+.anno.text .tx[contenteditable="true"] { cursor: text; }
+.anno.text .tx:empty::before {
   content: "Texte…";
   color: rgba(0,0,0,.35);
 }
@@ -192,6 +196,8 @@ canvas.draw {
   cursor: pointer;
   display: none;
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  user-select: none;
+  -webkit-user-select: none;
 }
 .anno.selected .del-handle { display: block; }
 
