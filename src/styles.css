@@ -154,6 +154,7 @@ canvas.draw {
 .anno {
   position: absolute;
   pointer-events: auto;
+  z-index: 100;
 }
 .anno.selected { outline: 1px dashed var(--accent); outline-offset: 2px; }
 

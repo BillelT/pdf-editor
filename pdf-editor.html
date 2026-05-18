@@ -161,6 +161,7 @@ canvas.draw {
 .anno {
   position: absolute;
   pointer-events: auto;
+  z-index: 100;
 }
 .anno.selected { outline: 1px dashed var(--accent); outline-offset: 2px; }
 
@@ -249,11 +250,11 @@ canvas.draw {
   </div>
 
   <div class="tb-group">
-    <button class="btn tool active" data-tool="select" title="Sélectionner / déplacer">↖ Sélection</button>
-    <button class="btn tool" data-tool="text" title="Ajouter du texte">T Texte</button>
-    <button class="btn tool" data-tool="draw" title="Dessin libre">✎ Dessin</button>
-    <button class="btn tool" data-tool="check" title="Cocher une case (double-clic = ✔/✗)">✔ Coche</button>
-    <button class="btn tool" data-tool="erase" title="Gomme">⌫ Gomme</button>
+    <button class="btn tool active" data-tool="select" title="Sélectionner / déplacer (V)">↖ Sélection</button>
+    <button class="btn tool" data-tool="text" title="Ajouter du texte (T)">T Texte</button>
+    <button class="btn tool" data-tool="draw" title="Dessin libre (P)">✎ Dessin</button>
+    <button class="btn tool" data-tool="check" title="Cocher une case — double-clic = ✔/✗ (C)">✔ Coche</button>
+    <button class="btn tool" data-tool="erase" title="Gomme (E)">⌫ Gomme</button>
   </div>
 
   <div class="tb-group">
@@ -653,13 +654,18 @@ window.__PDFJS_WORKER_BLOB_URL__ = (function () {
   function startEditText(el, P, a) {
     select(a.id);
     el.contentEditable = "true";
-    el.focus();
-    var r = document.createRange();
-    r.selectNodeContents(el);
-    r.collapse(false);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
+    // Defer focus to the next tick so the browser's default mousedown
+    // focus handling can't steal it back (which used to blank/remove
+    // a freshly placed text box).
+    setTimeout(function () {
+      el.focus();
+      var r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }, 0);
   }
 
   function buildCheckEl(P, a) {
@@ -704,6 +710,7 @@ window.__PDFJS_WORKER_BLOB_URL__ = (function () {
     el.addEventListener("mousedown", function (e) {
       if (el.contentEditable === "true") return; // editing text
       e.stopPropagation();
+      e.preventDefault(); // avoid focus-steal / page text selection while dragging
 
       if (state.tool === "erase") {
         removeAnno(a.id);
@@ -777,6 +784,7 @@ window.__PDFJS_WORKER_BLOB_URL__ = (function () {
       if (state.tool === "select") { deselect(); return; }
 
       if (state.tool === "text") {
+        e.preventDefault(); // keep focus on the new box, don't let the page grab it
         var a = addAnno({
           type: "text", page: P.num, x: nx, y: ny,
           size: state.fontSize, color: state.color, text: ""
@@ -1067,9 +1075,19 @@ window.__PDFJS_WORKER_BLOB_URL__ = (function () {
 
     // keyboard
     document.addEventListener("keydown", function (e) {
-      var editing = document.activeElement &&
-        document.activeElement.isContentEditable;
+      var ae = document.activeElement;
+      var editing = ae && ae.isContentEditable;
+      var typing = editing ||
+        (ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName));
       var meta = e.ctrlKey || e.metaKey;
+
+      // Figma-style single-key tool shortcuts
+      if (!meta && !e.altKey && !typing) {
+        var sc = { v: "select", t: "text", p: "draw", c: "check", e: "erase" };
+        var tk = e.key.toLowerCase();
+        if (sc[tk]) { e.preventDefault(); setTool(sc[tk]); return; }
+      }
+
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault(); undo();
       } else if (meta && (e.key.toLowerCase() === "y" ||

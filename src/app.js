@@ -295,13 +295,18 @@
   function startEditText(el, P, a) {
     select(a.id);
     el.contentEditable = "true";
-    el.focus();
-    var r = document.createRange();
-    r.selectNodeContents(el);
-    r.collapse(false);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
+    // Defer focus to the next tick so the browser's default mousedown
+    // focus handling can't steal it back (which used to blank/remove
+    // a freshly placed text box).
+    setTimeout(function () {
+      el.focus();
+      var r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }, 0);
   }
 
   function buildCheckEl(P, a) {
@@ -346,6 +351,7 @@
     el.addEventListener("mousedown", function (e) {
       if (el.contentEditable === "true") return; // editing text
       e.stopPropagation();
+      e.preventDefault(); // avoid focus-steal / page text selection while dragging
 
       if (state.tool === "erase") {
         removeAnno(a.id);
@@ -419,6 +425,7 @@
       if (state.tool === "select") { deselect(); return; }
 
       if (state.tool === "text") {
+        e.preventDefault(); // keep focus on the new box, don't let the page grab it
         var a = addAnno({
           type: "text", page: P.num, x: nx, y: ny,
           size: state.fontSize, color: state.color, text: ""
@@ -709,9 +716,19 @@
 
     // keyboard
     document.addEventListener("keydown", function (e) {
-      var editing = document.activeElement &&
-        document.activeElement.isContentEditable;
+      var ae = document.activeElement;
+      var editing = ae && ae.isContentEditable;
+      var typing = editing ||
+        (ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName));
       var meta = e.ctrlKey || e.metaKey;
+
+      // Figma-style single-key tool shortcuts
+      if (!meta && !e.altKey && !typing) {
+        var sc = { v: "select", t: "text", p: "draw", c: "check", e: "erase" };
+        var tk = e.key.toLowerCase();
+        if (sc[tk]) { e.preventDefault(); setTool(sc[tk]); return; }
+      }
+
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault(); undo();
       } else if (meta && (e.key.toLowerCase() === "y" ||
