@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDF Editor — Billel</title>
+<link rel="stylesheet" href="./token.css" />
+<link rel="stylesheet" href="./components.css" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<!-- Stage : éditeur à GAUCHE + canvas à droite (layout cib-editor) -->
+<div class="stage">
+
+  <!-- ============ Éditeur (aside, collé au bord gauche) ============ -->
+  <aside class="editor">
+
+    <!-- Header fixe : titre + sous-titre uniquement -->
+    <header class="editor__head">
+      <h1 class="editor__title"><b>PDF Editor</b> <span>éditeur de PDF</span></h1>
+    </header>
+
+    <!-- Seule zone scrollable -->
+    <div class="editor__body">
+
+      <!-- Outils -->
+      <section class="editor__section">
+        <h2 class="editor__label">Outils</h2>
+        <nav class="toolbar" aria-label="Outils">
+          <button class="tool-btn is-active" data-tool="select" title="Sélection (V)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 8-6 2-2 6z"/></svg>
+            <span class="tool-btn__kbd">V</span>
+          </button>
+          <button class="tool-btn" data-tool="text" title="Texte (T)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg>
+            <span class="tool-btn__kbd">T</span>
+          </button>
+          <button class="tool-btn" data-tool="pen" title="Dessiner (P)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l3-1 11.5-11.5a2.1 2.1 0 0 0-3-3L3 17v4z"/><path d="M14 6l4 4"/></svg>
+            <span class="tool-btn__kbd">P</span>
+          </button>
+          <button class="tool-btn" data-tool="erase" title="Gommer (E)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6 6h10"/><path d="M21 11L13 3 3 13l6 6 12-12-1.5-1.5z"/></svg>
+            <span class="tool-btn__kbd">E</span>
+          </button>
+        </nav>
+      </section>
+
+      <!-- Panel contextuel : Sélection -->
+      <section class="editor__section" id="panel-select">
+        <h2 class="editor__label">Sélection</h2>
+        <p class="panel__hint">Clique sur un élément pour le sélectionner. Glisse pour déplacer. <kbd>Suppr</kbd> pour effacer.</p>
+        <div id="panel-selected"></div>
+      </section>
+
+      <!-- Panel contextuel : Texte -->
+      <section class="editor__section is-hidden" id="panel-text">
+        <h2 class="editor__label">Texte</h2>
+        <p class="panel__hint">Clique sur la page pour ajouter une zone de texte.</p>
+        <div>
+          <label class="field-label">Police</label>
+          <select class="select" id="text-font">
+            <option value="serif">Zodiak (serif)</option>
+            <option value="sans" selected>Switzer (sans)</option>
+          </select>
+        </div>
+        <div>
+          <div class="slider-row"><span>Taille</span><span class="slider-row__value" id="text-size-val">18</span></div>
+          <input id="text-size" class="slider" type="range" min="8" max="96" value="18" />
+        </div>
+        <div>
+          <label class="field-label">Graisse</label>
+          <select class="select" id="text-weight">
+            <option value="300">Light · 300</option>
+            <option value="400" selected>Regular · 400</option>
+            <option value="500">Medium · 500</option>
+            <option value="600">Semibold · 600</option>
+            <option value="700">Bold · 700</option>
+            <option value="800">Heavy · 800</option>
+          </select>
+        </div>
+        <label class="toggle">
+          <input id="text-italic" class="toggle__input" type="checkbox" />
+          <span class="toggle__track"></span>
+          <span>Italique</span>
+        </label>
+        <div>
+          <label class="field-label">Couleur</label>
+          <div class="palette">
+            <div class="palette__item">
+              <input id="text-color" class="palette__input" type="color" value="#1e1b22" />
+            </div>
+            <div class="swatches">
+              <button class="swatch" data-target="text-color" style="background:#1e1b22" data-color="#1e1b22"></button>
+              <button class="swatch" data-target="text-color" style="background:#f06800" data-color="#f06800"></button>
+              <button class="swatch" data-target="text-color" style="background:#6800f0" data-color="#6800f0"></button>
+              <button class="swatch" data-target="text-color" style="background:#ffffff;border:1px solid var(--color-fog)" data-color="#ffffff"></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel contextuel : Dessin -->
+      <section class="editor__section is-hidden" id="panel-pen">
+        <h2 class="editor__label">Dessin</h2>
+        <p class="panel__hint">Glisse sur la page pour dessiner.</p>
+        <div>
+          <div class="slider-row"><span>Épaisseur</span><span class="slider-row__value" id="pen-size-val">3</span></div>
+          <input id="pen-size" class="slider" type="range" min="1" max="40" value="3" />
+        </div>
+        <div>
+          <label class="field-label">Couleur</label>
+          <div class="palette">
+            <div class="palette__item">
+              <input id="pen-color" class="palette__input" type="color" value="#1e1b22" />
+            </div>
+            <div class="swatches">
+              <button class="swatch" data-target="pen-color" style="background:#1e1b22" data-color="#1e1b22"></button>
+              <button class="swatch" data-target="pen-color" style="background:#f06800" data-color="#f06800"></button>
+              <button class="swatch" data-target="pen-color" style="background:#6800f0" data-color="#6800f0"></button>
+              <button class="swatch" data-target="pen-color" style="background:#ff3366" data-color="#ff3366"></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel contextuel : Gomme -->
+      <section class="editor__section is-hidden" id="panel-erase">
+        <h2 class="editor__label">Gomme</h2>
+        <p class="panel__hint">Clique sur un élément pour le supprimer.</p>
+      </section>
+
+      <!-- Raccourcis -->
+      <section class="editor__section">
+        <h2 class="editor__label">Raccourcis</h2>
+        <ul class="kbd-list">
+          <li><kbd>V</kbd> Sélection</li>
+          <li><kbd>T</kbd> Texte</li>
+          <li><kbd>P</kbd> Stylo</li>
+          <li><kbd>E</kbd> Gomme</li>
+          <li><kbd>⌫</kbd> Supprimer</li>
+          <li><kbd>⌘</kbd>+<kbd>Z</kbd> Annuler</li>
+        </ul>
+      </section>
+
+      <!-- Actions de fin (dans le body, ordre soutien → principal) -->
+      <div class="editor__actions">
+        <div class="editor__actions-row">
+          <button id="btn-open" class="btn btn--quaternary btn--sm">Ouvrir un PDF</button>
+          <button id="btn-blank" class="btn btn--outline-orange btn--sm">Page blanche</button>
+        </div>
+        <button id="btn-export" class="btn btn--primary btn--sm">Exporter</button>
+        <input id="file-input" type="file" accept="application/pdf" hidden />
+      </div>
+    </div>
+
+    <!-- Footer fixe : statut + signature Billel -->
+    <footer class="editor__foot">
+      <p class="editor__credit">
+        <b id="status-tool">Outil : Sélection</b> — <span id="status-pages">Aucune page</span>
+      </p>
+      <p class="editor__credit">
+        un outil par <a class="text-link" href="https://www.billeltighidet.fr/" target="_blank" rel="noopener noreferrer" aria-label="Billel">Billel</a>
+      </p>
+    </footer>
+  </aside>
+
+  <!-- ============ Canvas (à droite de l'éditeur) ============ -->
+  <section class="editor__canvas editor__canvas--scroll" id="canvas-zone">
+    <div id="pages" class="pages"></div>
+
+    <!-- État vide -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-state__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+      </div>
+      <h2 class="empty-state__title">Commence ton édition</h2>
+      <p class="empty-state__lede">Ouvre un PDF ou démarre sur une page blanche.</p>
+      <div class="empty-state__actions">
+        <button id="btn-open-2" class="btn btn--primary">Ouvrir un PDF</button>
+        <button id="btn-blank-2" class="btn btn--outline-orange">Page blanche</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Moteurs PDF (lecture + export). Pas un framework UI : indispensables au fonctionnement. -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs" type="module"></script>
+<script type="module">
+  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+  window.pdfjsLib = pdfjsLib;
+  window.dispatchEvent(new Event('pdfjs-ready'));
+</script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="./app.js" defer></script>
+
+</body>
+</html>

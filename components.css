@@ -1,0 +1,802 @@
+/* =============================================================================
+   Billel
+   ---------------------------------------------------------------------------
+   Classes utilitaires des composants. Construites exclusivement à partir des
+   variables exposées par `token.css`. N'écris JAMAIS de valeur en dur ici —
+   tout doit passer par var(--…).
+
+   Convention : BEM-lite (`.btn`, `.btn--primary`, `.btn__icon`).
+============================================================================= */
+
+/* ---------- Buttons ------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:disabled,
+.btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Primary — orange / noir */
+
+.btn--primary {
+  background: var(--color-primary-orange);
+  color: var(--color-black);
+}
+
+.btn--primary:hover,
+.btn--primary.is-hover {
+  background: var(--color-black);
+  color: var(--color-primary-orange);
+}
+
+/* Secondary — violet / blanc */
+
+.btn--secondary {
+  background: var(--color-primary-purple);
+  color: var(--color-white);
+}
+
+.btn--secondary:hover,
+.btn--secondary.is-hover {
+  background: var(--color-white);
+  color: var(--color-primary-purple);
+}
+
+/* Tertiary — ink / paper */
+
+.btn--tertiary {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.btn--tertiary:hover,
+.btn--tertiary.is-hover {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* Quaternary — fog / slate */
+
+.btn--quaternary {
+  background: var(--color-fog);
+  color: var(--color-slate);
+}
+
+.btn--quaternary:hover,
+.btn--quaternary.is-hover {
+  background: var(--color-slate);
+  color: var(--color-fog);
+}
+
+/* Outline — Purple */
+
+.btn--outline-purple {
+  background: transparent;
+  border: 1px solid var(--color-primary-purple);
+  color: var(--color-primary-purple);
+}
+
+.btn--outline-purple:hover,
+.btn--outline-purple.is-hover {
+  background: var(--color-primary-purple);
+  color: var(--color-paper);
+}
+
+/* Outline — Orange */
+
+.btn--outline-orange {
+  background: transparent;
+  border: 1px solid var(--color-primary-orange);
+  color: var(--color-primary-orange);
+}
+
+.btn--outline-orange:hover,
+.btn--outline-orange.is-hover {
+  background: var(--color-primary-orange);
+  color: var(--color-ink);
+}
+
+/* Size modifier — aligne sur la hauteur de .input (pour .field--inline, header) */
+
+.btn--sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: 14px;
+}
+
+/* Nav-link — lien-action discret (header, footer)
+   Texte muted au repos, full ink au hover / .is-active. Pas un bouton à
+   proprement parler — c'est un <a> stylé. */
+
+.nav-link {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-stone);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--color-ink);
+}
+
+/* Btn-link — mini bouton inline ring 1px (Randomize, Reset view)
+   12px, padding 2/8, fond transparent, ring via box-shadow inset.
+   Bien plus petit que .btn--secondary — ne pas confondre. */
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  background: transparent;
+  color: var(--color-slate);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--color-fog);
+  transition: color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-link:hover {
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-slate);
+}
+
+/* ---------- Cards -------------------------------------------------------- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);              /* 16px */
+  padding: var(--space-4);          /* 16px */
+  border-radius: var(--radius-lg);  /* 16px */
+  font-family: var(--font-sans);
+}
+
+.card__title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.card__body {
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Slot d'icône en tête de card. Le SVG enfant doit utiliser
+   stroke="currentColor" pour hériter automatiquement de la couleur du texte
+   (ink sur card--light, paper sur card--dark). */
+.card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  color: inherit;
+}
+
+.card__icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.card--light {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.card--dark {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+/* ---------- Inputs ------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);  /* 8px 12px */
+  background: var(--color-white);
+  color: var(--color-ink);
+  border: 1px solid transparent;            /* invisible au repos → pas de saut au focus */
+  border-radius: var(--radius-md);          /* 12px */
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--color-stone);
+  font-weight: 400;
+}
+
+.input:focus,
+.input.is-focus {
+  border-color: var(--color-ink);
+}
+
+.input:disabled,
+.input.is-disabled {
+  background: transparent;
+  border-color: var(--color-stone);
+  color: var(--color-stone);
+  cursor: not-allowed;
+}
+
+/* Field--inline — input + bouton accolés (pattern signup) */
+
+.field--inline {
+  display: flex;
+  width: 100%;
+  background: var(--color-white);
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.field--inline:focus-within {
+  border-color: var(--color-ink);
+}
+
+.field--inline > .input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  flex: 1;
+}
+
+/* L'.input à l'intérieur ne montre pas son propre focus border ;
+   c'est le container qui s'éclaire via :focus-within. */
+.field--inline > .input:focus {
+  border-color: transparent;
+}
+
+.field--inline__action {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-white);
+  border-left: 1px solid var(--color-fog);
+  border-radius: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+
+.field--inline__action:hover {
+  background: var(--color-paper);
+}
+
+.field--inline__action:disabled {
+  color: var(--color-stone);
+  cursor: not-allowed;
+}
+
+/* Select — dropdown natif stylé
+   NB : la couleur du chevron est encodée en dur dans l'URL SVG (limitation
+   des background-image : les vars CSS ne passent pas dans les data URLs).
+   Si --color-slate change, mettre à jour les deux strokes ci-dessous. */
+
+.select {
+  width: 100%;
+  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
+  background-color: var(--color-white);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23423e46' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 12px;
+  color: var(--color-ink);
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  transition: border-color 0.15s ease;
+}
+
+.select:focus,
+.select.is-focus {
+  border-color: var(--color-ink);
+}
+
+.select:disabled,
+.select.is-disabled {
+  color: var(--color-stone);
+  cursor: not-allowed;
+  /* Chevron stone pour l'état disabled */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aaa9b2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* ---------- Controls ----------------------------------------------------- */
+
+/* Tabs — segmented control */
+
+.tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-paper);
+  border-radius: var(--radius-md);
+}
+
+.tabs__item {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-slate);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tabs__item:hover {
+  color: var(--color-ink);
+}
+
+.tabs__item--active {
+  background: var(--color-white);
+  color: var(--color-ink);
+}
+
+/* Slider — range input
+   NB : thumb à 16px (var(--space-4)) — l'échelle 4px ne couvre pas le 14px du
+   reference. Si tu veux du 14px pile, ajouter un --size-thumb dédié. */
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1px;
+  background: var(--color-fog);
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: var(--space-4);
+  height: var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  cursor: pointer;
+}
+
+.slider:disabled { cursor: not-allowed; }
+.slider:disabled::-webkit-slider-thumb { background: var(--color-stone); }
+.slider:disabled::-moz-range-thumb { background: var(--color-stone); }
+
+/* Slider-row : label gauche / valeur droite */
+
+.slider-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-slate);
+}
+
+.slider-row__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  color: var(--color-stone);
+}
+
+/* Toggle — switch (track 40 × 20, thumb 16) */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.toggle__input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle__track {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: var(--color-fog);
+  border-radius: var(--radius-full);
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toggle__track::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--color-white);
+  transition: transform 0.15s ease;
+}
+
+.toggle__input:checked + .toggle__track {
+  background: var(--color-ink);
+}
+
+.toggle__input:checked + .toggle__track::before {
+  transform: translateX(20px);
+}
+
+.toggle__input:disabled + .toggle__track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Palette — color picker grid (cadre blanc autour du <input type="color">) */
+
+.palette {
+  display: flex;
+}
+
+.palette__item {
+  width: 48px;
+  height: 40px;
+  padding: var(--space-2) var(--space-1);
+  background: var(--color-white);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-fog);
+  cursor: pointer;
+  display: flex;
+}
+
+.palette__input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+
+.palette__input::-webkit-color-swatch-wrapper { padding: 0; }
+.palette__input::-webkit-color-swatch { border: none; border-radius: var(--radius-xs); }
+.palette__input::-moz-color-swatch { border: none; border-radius: var(--radius-xs); }
+
+/* ---------- Markers ------------------------------------------------------ */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3);  /* 4px 12px */
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.pill--light {
+  background: var(--color-white);
+  color: var(--color-ink);
+}
+
+.pill--dark {
+  background: var(--color-ink);
+  color: var(--color-white);
+}
+
+/* Divider-text — séparateur étiqueté (ligne — texte — ligne)
+   Le label vient du contenu enfant. Texte court conseillé. */
+
+.divider-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-stone);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.divider-text::before,
+.divider-text::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-fog);
+}
+
+/* =============================================================================
+   Layouts
+   ---------------------------------------------------------------------------
+   Patterns de composition réutilisables. Chaque layout combine des composants
+   existants. Construit uniquement avec nos tokens — aucune valeur hardcodée.
+============================================================================= */
+
+/* ---------- Hero ------------------------------------------------------- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding: var(--space-16) var(--space-8);
+  background: var(--color-white);
+}
+
+.hero__title {
+  font-family: var(--font-serif);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 500;
+  line-height: 1.05;
+  color: var(--color-ink);
+  max-width: 16ch;
+}
+
+.hero__lede {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-slate);
+  max-width: 50ch;
+}
+
+.hero__actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ---------- App header ------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-8);
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-fog);
+}
+
+.app-header__brand {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ---------- Signup form ------------------------------------------------ */
+
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 380px;
+  padding: var(--space-8);
+  background: var(--color-white);
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-lg);
+}
+
+.signup-form__heading {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.signup-form__lede {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-slate);
+  margin-bottom: var(--space-2);
+}
+
+.signup-form__submit {
+  margin-top: var(--space-2);
+}
+
+/* ---------- App footer ------------------------------------------------- */
+
+.app-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-8) var(--space-6);
+  background: var(--color-paper);
+  border-top: 1px solid var(--color-fog);
+}
+
+.app-footer__top {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-8);
+}
+
+.app-footer__brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-footer__brand {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.app-footer__tagline {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-slate);
+  max-width: 30ch;
+}
+
+.app-footer__cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+.app-footer__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-footer__heading {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-slate);
+  margin-bottom: var(--space-2);
+}
+
+.app-footer__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-fog);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-stone);
+}
+
+/* ---------- Editor ----------------------------------------------------- */
+
+.editor {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-fog);
+}
+
+.editor__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.editor__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.editor__group-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-slate);
+}
+
+.editor__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  background: var(--color-paper);
+  border-radius: var(--radius-md);
+  color: var(--color-stone);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+/* =============================================================================
+   Utilities
+   ---------------------------------------------------------------------------
+   Classes utilitaires atomiques (1 propriété = 1 classe). Préférer toujours
+   un composant nommé quand le pattern se répète — les utilities sont là pour
+   les ajustements ponctuels.
+============================================================================= */
+
+/* ---------- Radius ------------------------------------------------------ */
+
+.rounded-none { border-radius: var(--radius-none); }
+.rounded-xs   { border-radius: var(--radius-xs); }
+.rounded-sm   { border-radius: var(--radius-sm); }
+.rounded-md   { border-radius: var(--radius-md); }
+.rounded-lg   { border-radius: var(--radius-lg); }
+.rounded-xl   { border-radius: var(--radius-xl); }
+.rounded-2xl  { border-radius: var(--radius-2xl); }
+.rounded-3xl  { border-radius: var(--radius-3xl); }
+.rounded-4xl  { border-radius: var(--radius-4xl); }
+.rounded-full { border-radius: var(--radius-full); }

@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "static",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "port": 4319
+      "name": "pdf-editor",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "-p", "4599", "-c-1", "."],
+      "port": 4599
     }
   ]
 }

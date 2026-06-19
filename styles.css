@@ -1,0 +1,408 @@
+/* =============================================================================
+   PDF Editor — styles spécifiques (au-dessus du DS Billel)
+   ---------------------------------------------------------------------------
+   Tout passe par var(--…). Aucune valeur visuelle en dur.
+============================================================================= */
+
+html, body {
+  height: 100%;
+  background: var(--color-paper);
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+
+body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   Coquille éditeur — layout cib-editor, tokens Billel
+   ---------------------------------------------------------------------------
+   Aside .editor collé au bord GAUCHE du canvas (signature visuelle des outils).
+   Découpe head (fixe) / body (seule zone scrollable) / foot (fixe).
+============================================================================= */
+
+.stage {
+  display: flex;
+  height: 100%;
+}
+
+/* Coquille : pile verticale pleine hauteur, largeur naturelle (plancher 320px).
+   Override du .editor (grid) de components.css. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  height: 100%;
+  width: 22rem;                /* panneau de réglages : largeur stable (cf. aside d'origine) */
+  gap: 0;
+  padding: 0;
+  background: var(--color-white);
+  border: none;
+  border-right: 1px solid var(--color-fog);   /* aside à GAUCHE — jamais border-left */
+  border-radius: 0;
+}
+
+/* Header fixe : titre + sous-titre uniquement */
+.editor__head {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--color-fog);
+}
+
+.editor__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.editor__title b { font-weight: 600; color: var(--color-ink); }
+.editor__title span { font-size: 12px; color: var(--color-stone); }
+
+/* Seule zone scrollable */
+.editor__body {
+  flex: 1 1 auto;
+  min-height: 0;                 /* indispensable : autorise le rétrécissement → le scroll */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+}
+
+/* Groupe étiqueté */
+.editor__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.editor__section.is-hidden { display: none; }
+
+.editor__label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-stone);
+}
+
+/* Actions de fin (dans le body, défilent avec lui) */
+.editor__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.editor__actions-row { display: flex; gap: var(--space-3); }
+.editor__actions-row > .btn { flex: 1; }
+
+/* Footer fixe : statut + signature */
+.editor__foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--color-fog);
+}
+
+.editor__credit {
+  width: 0;
+  min-width: 100%;          /* remplit le parent et wrappe, sans pousser la largeur de l'aside */
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-slate);
+}
+
+.editor__credit b { font-weight: 600; color: var(--color-ink); }
+
+/* Lien texte inline (signature Billel) */
+.text-link {
+  color: var(--color-primary-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.text-link:hover { text-decoration: underline; }
+
+/* Canvas : occupe le reste, scrollable */
+.editor__canvas--scroll {
+  flex: 1 1 auto;
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-paper);
+  border-radius: 0;
+  padding: var(--space-8);
+}
+
+/* ---------- Toolbar (segment d'icônes) --------------------------------- */
+
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-paper);
+  border-radius: var(--radius-md);
+}
+
+.tool-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1);
+  background: transparent;
+  color: var(--color-slate);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.tool-btn:hover {
+  color: var(--color-ink);
+}
+
+.tool-btn.is-active {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.tool-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.tool-btn__kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* ---------- Panel hint -------------------------------------------------- */
+
+.panel__hint {
+  width: 0;
+  min-width: 100%;          /* wrappe au plancher de l'aside, sans pousser sa largeur naturelle */
+  font-size: 13px;
+  color: var(--color-slate);
+  line-height: 1.5;
+}
+
+.field-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-slate);
+  margin-bottom: var(--space-1);
+  display: block;
+}
+
+/* ---------- Swatches inline (à côté du color picker) ------------------- */
+
+.palette {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatches {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.swatch:hover {
+  transform: scale(1.15);
+}
+
+/* ---------- Kbd list / shortcuts -------------------------------------- */
+
+.kbd-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--color-slate);
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 var(--space-1);
+  background: var(--color-paper);
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 11px;
+  color: var(--color-ink);
+}
+
+/* ---------- Pages -------------------------------------------------------- */
+
+.pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.page {
+  position: relative;
+  background: var(--color-white);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px rgba(30, 27, 34, 0.06), 0 8px 24px rgba(30, 27, 34, 0.08);
+  overflow: hidden;
+}
+
+.page__canvas {
+  display: block;
+}
+
+.page__overlay {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+}
+
+.page__overlay--text  { cursor: text; }
+.page__overlay--pen   { cursor: crosshair; }
+.page__overlay--erase { cursor: cell; }
+
+.page__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.page__svg path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: stroke;
+}
+
+.page__overlay--erase .page__svg path,
+.page__overlay--select .page__svg path {
+  cursor: pointer;
+}
+
+/* En mode pen/text, les annotations existantes laissent passer le clic
+   (pour qu'on puisse démarrer un nouveau tracé / texte par-dessus). */
+.page__overlay--pen  .text-anno,
+.page__overlay--text .text-anno {
+  pointer-events: none;
+}
+
+.page__overlay--pen  .page__svg path,
+.page__overlay--text .page__svg path {
+  pointer-events: none;
+}
+
+/* ---------- Text annotations ------------------------------------------- */
+
+.text-anno {
+  position: absolute;
+  min-width: 32px;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px dashed transparent;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  cursor: move;
+  user-select: none;
+}
+
+.text-anno:hover {
+  border-color: var(--color-fog);
+}
+
+.text-anno.is-selected {
+  border-color: var(--color-primary-orange);
+}
+
+.text-anno.is-editing {
+  cursor: text;
+  user-select: text;
+  border-color: var(--color-primary-orange);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.page__overlay--erase .text-anno { cursor: cell; }
+.page__overlay--text  .text-anno { cursor: text; }
+
+/* ---------- Empty state ------------------------------------------------- */
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-slate);
+}
+
+.empty-state.is-hidden { display: none; }
+
+.empty-state__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-stone);
+  margin-bottom: var(--space-2);
+}
+
+.empty-state__icon svg { width: 100%; height: 100%; }
+
+.empty-state__title {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 500;
+  color: var(--color-ink);
+  line-height: 1.1;
+}
+
+.empty-state__lede {
+  font-size: 16px;
+  color: var(--color-slate);
+  max-width: 36ch;
+}
+
+.empty-state__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
