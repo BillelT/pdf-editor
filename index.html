@@ -19,10 +19,16 @@
     <!-- Header fixe : titre + sous-titre uniquement -->
     <header class="editor__head">
       <h1 class="editor__title"><b>PDF Editor</b> <span>éditeur de PDF</span></h1>
+      <nav class="tabs mode-tabs" id="mode-tabs" aria-label="Mode">
+        <button class="tabs__item tabs__item--active" data-mode="edit">Éditeur</button>
+        <button class="tabs__item" data-mode="merge">Fusion</button>
+      </nav>
     </header>
 
     <!-- Seule zone scrollable -->
     <div class="editor__body">
+
+     <div id="view-edit">
 
       <!-- Outils -->
       <section class="editor__section">
@@ -153,6 +159,34 @@
         <button id="btn-export" class="btn btn--primary btn--sm">Exporter</button>
         <input id="file-input" type="file" accept="application/pdf" hidden />
       </div>
+
+     </div>
+     <!-- /view-edit -->
+
+     <div id="view-merge" class="is-hidden">
+
+      <!-- Liste des PDF à fusionner -->
+      <section class="editor__section">
+        <h2 class="editor__label">Fusionner des PDF</h2>
+        <p class="panel__hint">Ajoute plusieurs fichiers, ordonne-les, puis fusionne-les en un seul PDF.</p>
+        <button id="btn-merge-add" class="btn btn--outline-orange btn--sm">+ Ajouter des PDF</button>
+        <input id="merge-file-input" type="file" accept="application/pdf" multiple hidden />
+      </section>
+
+      <section class="editor__section">
+        <ol id="merge-list" class="merge-list"></ol>
+        <p class="panel__hint" id="merge-empty-hint">Aucun fichier ajouté pour l'instant.</p>
+      </section>
+
+      <!-- Actions de fusion -->
+      <div class="editor__actions">
+        <button id="btn-merge-open" class="btn btn--quaternary btn--sm" disabled>Ouvrir dans l'éditeur</button>
+        <button id="btn-merge-download" class="btn btn--primary btn--sm" disabled>Fusionner &amp; télécharger</button>
+      </div>
+
+     </div>
+     <!-- /view-merge -->
+
     </div>
 
     <!-- Footer fixe : statut + signature Billel -->
@@ -176,10 +210,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
       </div>
       <h2 class="empty-state__title">Commence ton édition</h2>
-      <p class="empty-state__lede">Ouvre un PDF ou démarre sur une page blanche.</p>
+      <p class="empty-state__lede">Ouvre un PDF ou démarre sur une page blanche. Tu peux aussi fusionner plusieurs PDF en un seul.</p>
       <div class="empty-state__actions">
         <button id="btn-open-2" class="btn btn--primary">Ouvrir un PDF</button>
         <button id="btn-blank-2" class="btn btn--outline-orange">Page blanche</button>
+        <button id="btn-merge-2" class="btn btn--quaternary">Fusionner des PDF</button>
       </div>
     </div>
   </section>

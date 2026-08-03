@@ -11,9 +11,11 @@
   // ---------- État global ------------------------------------------------
 
   const state = {
+    mode: 'edit',        // 'edit' | 'merge'
     tool: 'select',
     pages: [],           // [{ width, height, scale, pdfPage?, annotations: [], el, overlay, svg, ctx }]
     selected: null,      // { pageIndex, annoId } | null
+    mergeFiles: [],      // [{ id, name, bytes, pageCount, error }]
     history: [],         // undo stack — snapshots des annotations
     textStyle: {
       font: 'sans',
@@ -44,7 +46,27 @@
     bindShortcuts();
     bindPanels();
     bindCanvasZone();
+    bindModeTabs();
+    bindMergePanel();
     updateUI();
+  }
+
+  // ---------- Mode (Éditeur / Fusion) -------------------------------------
+
+  function bindModeTabs () {
+    document.querySelectorAll('#mode-tabs .tabs__item').forEach(btn => {
+      btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+    $('btn-merge-2')?.addEventListener('click', () => setMode('merge'));
+  }
+
+  function setMode (mode) {
+    state.mode = mode;
+    document.querySelectorAll('#mode-tabs .tabs__item').forEach(b => {
+      b.classList.toggle('tabs__item--active', b.dataset.mode === mode);
+    });
+    $('view-edit').classList.toggle('is-hidden', mode !== 'edit');
+    $('view-merge').classList.toggle('is-hidden', mode !== 'merge');
   }
 
   // ---------- Toolbar ----------------------------------------------------
@@ -86,12 +108,14 @@
       const isTyping = t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        undo();
+        if (state.mode === 'edit') {
+          e.preventDefault();
+          undo();
+        }
         return;
       }
 
-      if (isTyping) return;
+      if (isTyping || state.mode !== 'edit') return;
 
       switch (e.key.toLowerCase()) {
         case 'v': setTool('select'); break;
@@ -199,9 +223,13 @@
   // ---------- Chargement de PDF ------------------------------------------
 
   async function loadPDF (file) {
-    await ensurePdfJsReady();
     const ab = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: ab }).promise;
+    await loadPDFFromBytes(ab);
+  }
+
+  async function loadPDFFromBytes (bytes) {
+    await ensurePdfJsReady();
+    const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
 
     resetPages();
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -236,6 +264,159 @@
     $('empty-state').classList.add('is-hidden');
     $('status-pages').textContent = `${state.pages.length} page${state.pages.length > 1 ? 's' : ''}`;
     setTool(state.tool);
+  }
+
+  // ---------- Fusion de PDF ------------------------------------------------
+
+  function bindMergePanel () {
+    $('btn-merge-add').addEventListener('click', () => $('merge-file-input').click());
+
+    $('merge-file-input').addEventListener('change', async e => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      await addMergeFiles(files);
+    });
+
+    $('btn-merge-download').addEventListener('click', mergeAndDownload);
+    $('btn-merge-open').addEventListener('click', mergeAndOpenInEditor);
+  }
+
+  async function addMergeFiles (files) {
+    const entries = files.map(file => ({
+      id: uid(),
+      name: file.name,
+      bytes: null,
+      pageCount: null,
+      error: null,
+    }));
+    state.mergeFiles.push(...entries);
+    renderMergeList();
+
+    await Promise.all(entries.map(async (entry, i) => {
+      try {
+        const bytes = await files[i].arrayBuffer();
+        const { PDFDocument } = window.PDFLib;
+        const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+        entry.bytes = bytes;
+        entry.pageCount = doc.getPageCount();
+      } catch (err) {
+        entry.error = 'Fichier PDF invalide';
+      }
+      renderMergeList();
+    }));
+  }
+
+  function moveMergeFile (id, dir) {
+    const list = state.mergeFiles;
+    const i = list.findIndex(f => f.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    renderMergeList();
+  }
+
+  function removeMergeFile (id) {
+    state.mergeFiles = state.mergeFiles.filter(f => f.id !== id);
+    renderMergeList();
+  }
+
+  function renderMergeList () {
+    const list = $('merge-list');
+    const hint = $('merge-empty-hint');
+    const files = state.mergeFiles;
+
+    hint.classList.toggle('is-hidden', files.length > 0);
+    list.innerHTML = '';
+
+    files.forEach((entry, i) => {
+      const li = document.createElement('li');
+      li.className = 'merge-item';
+      const meta = entry.error
+        ? `<span class="merge-item__meta is-error">${entry.error}</span>`
+        : entry.pageCount === null
+          ? `<span class="merge-item__meta">Analyse…</span>`
+          : `<span class="merge-item__meta">${entry.pageCount} page${entry.pageCount > 1 ? 's' : ''}</span>`;
+
+      li.innerHTML = `
+        <span class="merge-item__index">${i + 1}</span>
+        <span class="merge-item__info">
+          <span class="merge-item__name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+          ${meta}
+        </span>
+        <span class="merge-item__actions">
+          <button class="merge-item__btn" data-action="up" title="Monter" ${i === 0 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+          </button>
+          <button class="merge-item__btn" data-action="down" title="Descendre" ${i === files.length - 1 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <button class="merge-item__btn" data-action="remove" title="Retirer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+          </button>
+        </span>
+      `;
+      li.querySelector('[data-action="up"]').addEventListener('click', () => moveMergeFile(entry.id, -1));
+      li.querySelector('[data-action="down"]').addEventListener('click', () => moveMergeFile(entry.id, 1));
+      li.querySelector('[data-action="remove"]').addEventListener('click', () => removeMergeFile(entry.id));
+      list.appendChild(li);
+    });
+
+    const validCount = files.filter(f => f.bytes && !f.error).length;
+    $('btn-merge-download').disabled = validCount < 2;
+    $('btn-merge-open').disabled = validCount < 2;
+  }
+
+  function escapeHtml (s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  async function buildMergedPdf () {
+    const { PDFDocument } = window.PDFLib;
+    const merged = await PDFDocument.create();
+    const validFiles = state.mergeFiles.filter(f => f.bytes && !f.error);
+    for (const entry of validFiles) {
+      const src = await PDFDocument.load(entry.bytes, { ignoreEncryption: true });
+      const copied = await merged.copyPages(src, src.getPageIndices());
+      copied.forEach(p => merged.addPage(p));
+    }
+    return merged.save();
+  }
+
+  async function mergeAndDownload () {
+    $('btn-merge-download').disabled = true;
+    $('btn-merge-download').textContent = 'Fusion…';
+    try {
+      const bytes = await buildMergedPdf();
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pdf-fusionne-${Date.now()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('La fusion a échoué : ' + err.message);
+    } finally {
+      $('btn-merge-download').textContent = 'Fusionner & télécharger';
+      renderMergeList();
+    }
+  }
+
+  async function mergeAndOpenInEditor () {
+    $('btn-merge-open').disabled = true;
+    $('btn-merge-open').textContent = 'Fusion…';
+    try {
+      const bytes = await buildMergedPdf();
+      await loadPDFFromBytes(bytes);
+      setMode('edit');
+    } catch (err) {
+      alert('La fusion a échoué : ' + err.message);
+    } finally {
+      $('btn-merge-open').textContent = "Ouvrir dans l'éditeur";
+      renderMergeList();
+    }
   }
 
   async function renderPage (pdfPage) {
