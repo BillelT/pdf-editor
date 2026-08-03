@@ -22,6 +22,7 @@
       <nav class="tabs mode-tabs" id="mode-tabs" aria-label="Mode">
         <button class="tabs__item tabs__item--active" data-mode="edit">Éditeur</button>
         <button class="tabs__item" data-mode="merge">Fusion</button>
+        <button class="tabs__item" data-mode="compress">Compresser</button>
       </nav>
     </header>
 
@@ -186,6 +187,44 @@
 
      </div>
      <!-- /view-merge -->
+
+     <div id="view-compress" class="is-hidden">
+
+      <!-- Choix du fichier -->
+      <section class="editor__section">
+        <h2 class="editor__label">Compresser un PDF</h2>
+        <p class="panel__hint">Réduit le poids d'un PDF en le convertissant en pages-images optimisées. Idéal pour les PDF scannés ou remplis d'images ; le texte ne sera plus sélectionnable dans le résultat.</p>
+        <button id="btn-compress-choose" class="btn btn--outline-orange btn--sm">Choisir un PDF</button>
+        <input id="compress-file-input" type="file" accept="application/pdf" hidden />
+      </section>
+
+      <!-- Infos fichier + comparaison de taille -->
+      <section class="editor__section is-hidden" id="compress-info">
+        <h2 class="editor__label">Fichier</h2>
+        <div class="compress-card">
+          <p class="compress-card__name" id="compress-file-name"></p>
+          <p class="compress-card__sizes" id="compress-file-sizes"></p>
+        </div>
+      </section>
+
+      <!-- Niveau de compression -->
+      <section class="editor__section is-hidden" id="compress-quality-section">
+        <h2 class="editor__label">Niveau</h2>
+        <div class="tabs" id="compress-quality-tabs">
+          <button class="tabs__item" data-quality="low">Fichier minimal</button>
+          <button class="tabs__item tabs__item--active" data-quality="medium">Équilibré</button>
+          <button class="tabs__item" data-quality="high">Haute qualité</button>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="editor__actions">
+        <button id="btn-compress-open" class="btn btn--quaternary btn--sm" disabled>Ouvrir dans l'éditeur</button>
+        <button id="btn-compress-download" class="btn btn--primary btn--sm" disabled>Compresser &amp; télécharger</button>
+      </div>
+
+     </div>
+     <!-- /view-compress -->
 
     </div>
 
