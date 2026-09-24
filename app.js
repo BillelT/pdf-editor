@@ -25,10 +25,10 @@
       size: 18,
       weight: 400,
       italic: false,
-      color: '#1e1b22',
+      color: '#120f0d',
     },
     penStyle: {
-      color: '#1e1b22',
+      color: '#120f0d',
       size: 3,
     },
     drawing: null,       // stroke en cours
@@ -809,7 +809,7 @@
     el.style.left = `${anno.x / page.width * 100}%`;
     el.style.top = `${anno.y / page.height * 100}%`;
     el.style.width = `${anno.width / page.width * 100}%`;
-    content.style.fontFamily = anno.font === 'serif' ? 'var(--font-serif)' : 'var(--font-sans)';
+    content.style.fontFamily = anno.font === 'serif' ? 'var(--font-content-serif)' : 'var(--font-content-sans)';
     content.style.fontSize = `${anno.size}px`;
     content.style.fontWeight = anno.weight;
     content.style.fontStyle = anno.italic ? 'italic' : 'normal';
@@ -1006,7 +1006,7 @@
     path.setAttribute('stroke-width', stroke.size);
     path.classList.toggle('is-selected', state.selected?.annoId === stroke.id);
     if (state.selected?.annoId === stroke.id) {
-      path.style.filter = 'drop-shadow(0 0 2px var(--color-primary-orange))';
+      path.style.filter = 'drop-shadow(0 0 2px var(--b-accent))';
     } else {
       path.style.filter = '';
     }
@@ -1149,12 +1149,12 @@
     if (!a) { target.innerHTML = ''; return; }
     if (a.type === 'text') {
       target.innerHTML = `
-        <div class="panel__hint" style="color: var(--color-ink);">
+        <div class="panel__hint" style="color: var(--b-ink);">
           Zone de texte sélectionnée. <br/>Passe en outil <kbd>T</kbd> pour éditer ses paramètres, ou double-clique pour éditer le contenu.
         </div>`;
     } else if (a.type === 'stroke') {
       target.innerHTML = `
-        <div class="panel__hint" style="color: var(--color-ink);">
+        <div class="panel__hint" style="color: var(--b-ink);">
           Tracé sélectionné — <kbd>⌫</kbd> pour supprimer.
         </div>`;
     }

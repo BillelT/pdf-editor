@@ -1,20 +1,24 @@
 /* =============================================================================
-   Billel
+   Billel — token.css
    ---------------------------------------------------------------------------
-   Source de vérité pour toutes les variables du design system : couleurs,
-   typographie, espacements, radii. À importer en premier dans tout projet.
+   Source unique de vérité pour toutes les valeurs du design system perso
+   (b-token) : couleurs, espacement, rayons, typo, ombres, mouvement.
+   Toute interface doit charger ce fichier EN PREMIER, puis référencer
+   var(--b-…). Jamais de valeur « à l'œil ».
 ============================================================================= */
 
-/* ---------- Reset -------------------------------------------------------- */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  border: none;
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('./fonts/CabinetGrotesk-Variable.woff2') format('woff2-variations');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
 }
 
-/* ---------- Fonts -------------------------------------------------------- */
+/* ---------- Fonts de contenu (annotations PDF) ---------------------------
+   Hors design system : ce sont des polices que l'utilisateur choisit pour
+   SON texte sur le PDF (comme un traitement de texte), pas la typo de
+   l'interface — qui utilise --b-font-sans (Cabinet Grotesk) ci-dessous. */
 
 @font-face {
   font-family: 'Switzer';
@@ -49,55 +53,162 @@
 }
 
 :root {
-  /* ---------- Colors · Neutrals ----------------------------------------- */
-  /* Échelle du plus clair au plus foncé.                                   */
-  --color-white: #ffffff;
-  --color-paper: #f5f5f5;
-  --color-fog: #d3d1d6;
-  --color-stone: #aaa9b2;
-  --color-slate: #423e46;
-  --color-ink: #1e1b22;
-  --color-black: #000000;
+  /* =========================================================
+     1. COULEURS
+     ========================================================= */
 
-  /* ---------- Colors · Brand ------------------------------------------- */
-  --color-primary-orange: #f06800;
-  --color-primary-purple: #6800f0;
+  /* ---- Primitives neutres (encre + blanc) ---- */
+  --b-black: #120f0d;
+  --b-white: #fff9f5;
+  --b-ink: #120f0d;
 
-  /* ---------- Typography ----------------------------------------------- */
-  --font-sans: 'Switzer', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Zodiak', Georgia, 'Times New Roman', serif;
+  /* ---- Rampe de gris (5 tons, palette perso — teintés orange marque hue 20-28°) ---- */
+  --b-gray-900: #333231;
+  --b-gray-700: #3b3735;
+  --b-gray-600: #93857d;
+  --b-gray-300: #dcd5d0;
+  --b-gray-100: #f1edeb;
 
-  /* ---------- Spacing -------------------------------------------------- */
-  /* Echelle 4px. Utilisable pour padding, margin, gap, top/left, etc.     */
-  /* Le suffixe = nombre × 4px. Ex : --space-8 = 32px.                     */
-  --space-0: 0;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-  --space-20: 80px;
-  --space-24: 96px;
+  /* ---- Rôles de texte ---- */
+  --b-text: var(--b-ink);
+  --b-text-muted: var(--b-gray-700);
+  --b-text-faint: var(--b-gray-700);
+  --b-text-control: var(--b-gray-700);
 
-  /* ---------- Radius --------------------------------------------------- */
-  /* Échelle 4px. Utilisable directement via var(--radius-*) ou via les     */
-  /* classes utilitaires .rounded-* exposées dans components.css.          */
-  --radius-none: 0;
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
-  --radius-3xl: 28px;
-  --radius-4xl: 32px;
-  --radius-full: 9999px;
+  /* ---- Rôles de surface ---- */
+  --b-surface: var(--b-white);
+  --b-surface-muted: var(--b-gray-100);
+  --b-surface-sunken: var(--b-gray-100);
 
-  /* ---------- Shadows -------------------------------------------------- */
-  /* --shadow-sm, --shadow-md, --shadow-lg */
+  /* ---- Rôles de bordure ---- */
+  --b-border: var(--b-gray-300);
+  --b-border-subtle: var(--b-gray-100);
+
+  /* ---- Schéma sombre ---- */
+  --b-dark-surface: var(--b-black);
+  --b-dark-text: var(--b-white);
+  --b-dark-text-muted: #fff9f5a6;
+  --b-dark-border: #fff9f526;
+
+  /* ---- Accent de marque (orange) ---- */
+  --b-accent: hsl(26, 100%, 47%);
+  --b-accent-40: #f0680066;
+  --b-accent-20: #f0680033;
+  --b-accent-red: #f04000;
+
+  /* ---- Overlays utilitaires ---- */
+  --b-track: rgba(0, 0, 0, 0.08);
+  --b-switch-off: rgba(0, 0, 0, 0.18);
+  --b-scrollbar-thumb: rgba(0, 0, 0, 0.18);
+
+  /* =========================================================
+     2. ESPACEMENT
+     ========================================================= */
+  --b-space-2: 2px;
+  --b-space-4: 4px;
+  --b-space-6: 6px;
+  --b-space-8: 8px;
+  --b-space-12: 12px;
+  --b-space-16: 16px;
+  --b-space-20: 20px;
+  --b-space-24: 24px;
+  --b-space-32: 32px;
+  --b-space-48: 48px;
+  --b-space-64: 64px;
+  --b-space-96: 96px;
+
+  /* =========================================================
+     3. RAYONS
+     ========================================================= */
+  --b-radius-2xs: 2px;
+  --b-radius-xs: 4px;
+  --b-radius-sm: 6px;
+  --b-radius-md: 8px;
+  --b-radius-lg: 32px;
+  --b-radius-full: 9999px;
+
+  /* =========================================================
+     4. TYPOGRAPHIE
+     ========================================================= */
+  --b-font-sans: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --b-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --b-text-xs: 12px;
+  --b-text-sm: 14px;
+  --b-text-base: 16px;
+  --b-text-lg: 18px;
+  --b-text-xl: 20px;
+  --b-text-3xl: 36px;
+  --b-text-6xl: 72px;
+
+  --b-font-regular: 400;
+  --b-font-medium: 500;
+  --b-font-semibold: 600;
+  --b-font-bold: 700;
+
+  --b-leading-none: 1.02;
+  --b-leading-tight: 1.2;
+  --b-leading-snug: 1.333;
+  --b-leading-normal: 1.4;
+  --b-leading-relaxed: 1.5;
+
+  --b-tracking-tight: -0.01em;
+  --b-tracking-tighter: -0.03em;
+  --b-tracking-wide: 0.08em;
+
+  /* ---- Fonts de contenu (choix de police pour le texte ajouté au PDF) ---- */
+  --font-content-sans: 'Switzer', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-content-serif: 'Zodiak', Georgia, 'Times New Roman', serif;
+
+  /* =========================================================
+     5. OMBRES & FOCUS
+     ========================================================= */
+  --b-shadow-raised: 0 1px 2px #0000000a;
+  --b-shadow-switch-track: inset 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  --b-shadow-switch-thumb: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --b-shadow-focus: 0 0 0 3px rgba(0, 0, 0, 0.1);
+  --b-focus-outline: 2px solid var(--b-black);
+  --b-focus-offset: 2px;
+
+  /* =========================================================
+     6. MOUVEMENT
+     ========================================================= */
+  --b-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --b-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --b-duration-instant: 0.05s;
+  --b-duration-fast: 0.12s;
+  --b-duration: 0.15s;
+  --b-duration-slow: 0.2s;
+}
+
+/* =============================================================================
+   Base globale — appliquée partout, token.css étant chargé en premier
+============================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--b-accent-20);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--b-scrollbar-thumb) transparent;
+  overscroll-behavior: contain;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--b-scrollbar-thumb);
+  border-radius: var(--b-radius-full);
 }
