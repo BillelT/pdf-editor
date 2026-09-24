@@ -196,7 +196,7 @@ body {
 
 .tool-btn.is-active {
   background: var(--b-ink);
-  color: var(--b-surface-muted);
+  color: var(--b-white);
 }
 
 .tool-btn svg {
@@ -270,6 +270,38 @@ kbd {
   font-family: var(--b-font-mono);
   font-size: 11px;
   color: var(--b-ink);
+}
+
+/* ---------- Bulle d'aide (raccourcis, footer) --------------------------- */
+
+.help-popover {
+  position: relative;
+  display: inline-block;
+}
+
+.help-trigger {
+  display: inline-flex;
+  align-items: center;
+}
+
+.help-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--b-space-8));
+  z-index: 10;
+  width: 220px;
+  padding: var(--b-space-12);
+  background: var(--b-surface);
+  border: 1px solid var(--b-border);
+  border-radius: var(--b-radius-md);
+  box-shadow: 0 4px 16px rgba(18, 15, 13, 0.12), 0 1px 2px rgba(18, 15, 13, 0.06);
+}
+
+.help-panel[hidden] { display: none; }
+
+.help-panel .kbd-list {
+  grid-template-columns: 1fr;
+  gap: var(--b-space-6);
 }
 
 /* ---------- Compress card (compression de PDF) ------------------------- */
@@ -599,7 +631,7 @@ kbd {
   cursor: text;
   user-select: text;
   border-color: var(--b-accent);
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 249, 245, 0.5); /* --b-white à 50% */
 }
 
 .page__overlay--erase .text-anno__content { cursor: cell; }

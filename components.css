@@ -68,7 +68,7 @@
   border: 1px solid var(--b-ink);
   border-radius: var(--b-radius-md);
   color: var(--b-ink);
-  background: var(--b-surface);
+  background: transparent; /* pas de fond — juste la bordure */
 }
 .btn-tiertary:hover {
   background: var(--b-ink);
