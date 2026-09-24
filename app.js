@@ -1212,12 +1212,10 @@
   //
   // Le contenu d'origine (texte, images, vecteurs du PDF source) est recopié
   // tel quel via pdf-lib (copyPages) au lieu d'être rasterisé sur un canvas
-  // d'aperçu — c'est ce qui causait la perte de qualité après fusion/édition.
+  // d'aperçu — c'est ce qui causait la perte de qualité après fusion/édition,
+  // y compris sur les pages pivotées (/Rotate), gérées via pageTransform().
   // Les annotations (texte, tracés) sont dessinées en tant qu'objets PDF
   // natifs (drawText / drawLine), donc résolution-indépendantes elles aussi.
-  // Seul cas particulier : une page pivotée (/Rotate) qui porte des
-  // annotations repasse par l'ancien rendu raster, le repositionnement
-  // vectoriel fiable sur page pivotée n'étant pas géré.
 
   async function exportPDF () {
     if (state.pages.length === 0) return;
@@ -1256,11 +1254,6 @@
 
         if (srcDoc && i < srcDoc.getPageCount()) {
           const [copied] = await pdfDoc.copyPages(srcDoc, [i]);
-          const rotated = copied.getRotation().angle !== 0;
-          if (rotated && page.annotations.length > 0) {
-            await rasterizePageIntoDoc(pdfDoc, page);
-            continue;
-          }
           const pdfPage = pdfDoc.addPage(copied);
           try {
             await drawAnnotationsVector(pdfPage, page, pdfDoc, fontCache);
@@ -1306,6 +1299,29 @@
     return [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255];
   }
 
+  // Une page PDF a un contenu "brut" (raw, origine en bas à gauche, non
+  // affecté par /Rotate) et un rendu "visuel" tel qu'affiché par le lecteur
+  // (celui que voit pdf.js/le canvas d'édition, origine en haut à gauche).
+  // Nos annotations sont créées en coordonnées visuelles (clic souris sur le
+  // canvas) ; pour les dessiner dans le PDF il faut les reprojeter en
+  // coordonnées brutes selon la rotation de la page. Vérifié empiriquement
+  // (rendu pdf.js) pour les 4 valeurs possibles de /Rotate.
+  function pageTransform (pdfPage, page) {
+    const rot = ((pdfPage.getRotation().angle % 360) + 360) % 360;
+    return { rot, rawWidth: pdfPage.getWidth(), rawHeight: pdfPage.getHeight(), scale: page.scale };
+  }
+
+  function visualToRaw (t, canvasX, canvasY) {
+    const vx = canvasX / t.scale;
+    const vy = canvasY / t.scale;
+    switch (t.rot) {
+      case 90: return { x: vy, y: vx };
+      case 180: return { x: t.rawWidth - vx, y: vy };
+      case 270: return { x: t.rawWidth - vy, y: t.rawHeight - vx };
+      default: return { x: vx, y: t.rawHeight - vy };
+    }
+  }
+
   const STANDARD_FONT_VARIANTS = {
     sans: { regular: 'Helvetica', bold: 'HelveticaBold', italic: 'HelveticaOblique', boldItalic: 'HelveticaBoldOblique' },
     serif: { regular: 'TimesRoman', bold: 'TimesRomanBold', italic: 'TimesRomanItalic', boldItalic: 'TimesRomanBoldItalic' },
@@ -1341,11 +1357,11 @@
     return out;
   }
 
-  async function drawTextVector (pdfPage, anno, page, pdfDoc, fontCache) {
+  async function drawTextVector (pdfPage, anno, page, pdfDoc, fontCache, t) {
     if (!anno.content) return;
-    const { rgb } = window.PDFLib;
+    const { rgb, degrees } = window.PDFLib;
     const font = await getStandardFont(pdfDoc, fontCache, anno.font, anno.weight, anno.italic);
-    const scale = page.scale;
+    const scale = t.scale;
     const fontSizePt = anno.size / scale;
     const maxWidthPt = anno.width / scale;
     const lineHeightCanvas = anno.size * 1.3;
@@ -1353,22 +1369,27 @@
     const [r, g, b] = hexToRgb01(anno.color);
 
     const lines = wrapTextForFont(font, anno.content, maxWidthPt, fontSizePt);
-    const xPt = (anno.x + 4) / scale;
     lines.forEach((line, i) => {
       if (!line) return;
-      const yCanvasTop = anno.y + 2 + i * lineHeightCanvas;
-      const yTopPt = page.pdfHeight - yCanvasTop / scale;
-      pdfPage.drawText(line, { x: xPt, y: yTopPt - ascentPt, size: fontSizePt, font, color: rgb(r, g, b) });
+      // Ligne de base en espace visuel (même formule que le rendu canvas :
+      // padding 4px/2px + hauteur de ligne, cf. drawTextToCtx), reprojetée
+      // en une seule fois vers l'espace brut de la page.
+      const visualBaselineY = anno.y + 2 + i * lineHeightCanvas + ascentPt * scale;
+      const raw = visualToRaw(t, anno.x + 4, visualBaselineY);
+      pdfPage.drawText(line, {
+        x: raw.x, y: raw.y,
+        size: fontSizePt, font, color: rgb(r, g, b),
+        rotate: degrees(t.rot),
+      });
     });
   }
 
-  function drawStrokeVector (pdfPage, stroke, page) {
+  function drawStrokeVector (pdfPage, stroke, t) {
     if (!stroke.points || stroke.points.length === 0) return;
     const { rgb, LineCapStyle } = window.PDFLib;
     const [r, g, b] = hexToRgb01(stroke.color);
-    const scale = page.scale;
-    const toPt = (p) => ({ x: p.x / scale, y: page.pdfHeight - p.y / scale });
-    const thickness = Math.max(0.1, stroke.size / scale);
+    const toPt = (p) => visualToRaw(t, p.x, p.y);
+    const thickness = Math.max(0.1, stroke.size / t.scale);
     const color = rgb(r, g, b);
 
     if (stroke.points.length === 1) {
@@ -1388,19 +1409,22 @@
   }
 
   async function drawAnnotationsVector (pdfPage, page, pdfDoc, fontCache) {
+    const t = pageTransform(pdfPage, page);
     for (const a of page.annotations) {
-      if (a.type === 'stroke') drawStrokeVector(pdfPage, a, page);
+      if (a.type === 'stroke') drawStrokeVector(pdfPage, a, t);
     }
     for (const a of page.annotations) {
-      if (a.type === 'text') await drawTextVector(pdfPage, a, page, pdfDoc, fontCache);
+      if (a.type === 'text') await drawTextVector(pdfPage, a, page, pdfDoc, fontCache, t);
     }
   }
 
-  // ---------- Repli raster (page pivotée + annotations, cas rare) ---------
+  // ---------- Repli raster (cas limite, ex. caractère non supporté) -------
   //
   // Historique : composite canvas (rendu PDF + strokes + textes) → PNG
-  // embarqué dans une page pdf-lib. Perd en résolution, donc utilisé
-  // uniquement quand le placement vectoriel des annotations n'est pas fiable.
+  // embarqué dans une page pdf-lib. Perd en résolution ; ne sert plus que de
+  // filet de sécurité si le dessin vectoriel d'une page échoue (ex. police
+  // standard PDF ne supportant pas un caractère saisi), pour cette page
+  // uniquement — le reste du document garde son export vectoriel.
 
   async function rasterizePageIntoDoc (pdfDoc, page) {
     const out = document.createElement('canvas');
