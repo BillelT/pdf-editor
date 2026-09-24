@@ -469,8 +469,17 @@ kbd {
 
 /* ---------- Text annotations ------------------------------------------- */
 
+/* .text-anno = boîte positionnée/dimensionnée (largeur choisie par l'utilisateur,
+   comme dans Figma) ; .text-anno__content = zone de texte éditable à l'intérieur ;
+   les poignées de redimensionnement sont des enfants absolus de .text-anno,
+   à côté de .text-anno__content pour ne pas être effacées par
+   `content.textContent = ...`. */
+
 .text-anno {
   position: absolute;
+}
+
+.text-anno__content {
   min-width: 32px;
   padding: 2px 4px;
   background: transparent;
@@ -482,23 +491,48 @@ kbd {
   user-select: none;
 }
 
-.text-anno:hover {
+.text-anno__content:hover {
   border-color: var(--color-fog);
 }
 
-.text-anno.is-selected {
+.text-anno.is-selected .text-anno__content {
   border-color: var(--color-primary-orange);
 }
 
-.text-anno.is-editing {
+.text-anno.is-editing .text-anno__content {
   cursor: text;
   user-select: text;
   border-color: var(--color-primary-orange);
   background: rgba(255, 255, 255, 0.5);
 }
 
-.page__overlay--erase .text-anno { cursor: cell; }
-.page__overlay--text  .text-anno { cursor: text; }
+.page__overlay--erase .text-anno__content { cursor: cell; }
+.page__overlay--text  .text-anno__content { cursor: text; }
+
+/* Poignées de redimensionnement (largeur) — visibles seulement en mode
+   sélection, sur la boîte sélectionnée et hors édition de texte. */
+
+.text-anno__handle {
+  display: none;
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--color-white);
+  border: 1.5px solid var(--color-primary-orange);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.page__overlay--select .text-anno.is-selected:not(.is-editing) .text-anno__handle {
+  display: block;
+}
+
+.text-anno__handle--nw { left: 0;  top: 0;   transform: translate(-50%, -50%); cursor: nwse-resize; }
+.text-anno__handle--ne { right: 0; top: 0;   transform: translate(50%, -50%);  cursor: nesw-resize; }
+.text-anno__handle--sw { left: 0;  bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+.text-anno__handle--se { right: 0; bottom: 0; transform: translate(50%, 50%);  cursor: nwse-resize; }
+.text-anno__handle--w  { left: 0;  top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+.text-anno__handle--e  { right: 0; top: 50%; transform: translate(50%, -50%);  cursor: ew-resize; }
 
 /* ---------- Empty state ------------------------------------------------- */
 

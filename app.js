@@ -39,6 +39,11 @@
   let idSeq = 1;
   const uid = () => `a${idSeq++}`;
 
+  // Bytes du PDF actuellement chargé dans l'éditeur (null si page vierge).
+  // Conservés pour pouvoir recopier les pages en vectoriel à l'export,
+  // au lieu de repartir du rendu canvas basse résolution.
+  let sourcePdfBytes = null;
+
   const $ = (id) => document.getElementById(id);
 
   // ---------- Init -------------------------------------------------------
@@ -234,6 +239,9 @@
 
   async function loadPDFFromBytes (bytes) {
     await ensurePdfJsReady();
+    // pdf.js "consomme" le buffer transféré au worker : on en garde une copie
+    // intacte pour pouvoir recopier les pages en vectoriel à l'export.
+    sourcePdfBytes = bytes.slice(0);
     const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
 
     resetPages();
@@ -245,6 +253,7 @@
   }
 
   async function loadBlankPage () {
+    sourcePdfBytes = null;
     resetPages();
     await renderBlankPage();
     afterPagesLoaded();
@@ -765,36 +774,59 @@
     };
   }
 
+  // Pas de poignées n/s : la hauteur de la zone de texte suit toujours le
+  // contenu (comme un texte "auto height" dans Figma), seule la largeur
+  // se choisit à la main.
+  const RESIZE_HANDLES = ['nw', 'ne', 'w', 'e', 'sw', 'se'];
+  const MIN_TEXT_WIDTH = 40; // px, en espace page (canvas)
+
   function renderTextAnno (page, anno) {
     let el = page.overlay.querySelector(`[data-id="${anno.id}"]`);
+    let content;
     if (!el) {
       el = document.createElement('div');
       el.className = 'text-anno';
       el.dataset.id = anno.id;
       el.dataset.pageIndex = state.pages.indexOf(page);
+
+      content = document.createElement('div');
+      content.className = 'text-anno__content';
+      el.appendChild(content);
+
+      RESIZE_HANDLES.forEach(dir => {
+        const handle = document.createElement('div');
+        handle.className = `text-anno__handle text-anno__handle--${dir}`;
+        handle.dataset.handle = dir;
+        el.appendChild(handle);
+      });
+
       page.overlay.appendChild(el);
-      bindTextAnnoEvents(el);
+      bindTextAnnoEvents(el, content);
+    } else {
+      content = el.querySelector('.text-anno__content');
     }
+
     el.style.left = `${anno.x / page.width * 100}%`;
     el.style.top = `${anno.y / page.height * 100}%`;
-    el.style.minWidth = `${anno.width / page.width * 100}%`;
-    el.style.fontFamily = anno.font === 'serif' ? 'var(--font-serif)' : 'var(--font-sans)';
-    el.style.fontSize = `${anno.size}px`;
-    el.style.fontWeight = anno.weight;
-    el.style.fontStyle = anno.italic ? 'italic' : 'normal';
-    el.style.color = anno.color;
+    el.style.width = `${anno.width / page.width * 100}%`;
+    content.style.fontFamily = anno.font === 'serif' ? 'var(--font-serif)' : 'var(--font-sans)';
+    content.style.fontSize = `${anno.size}px`;
+    content.style.fontWeight = anno.weight;
+    content.style.fontStyle = anno.italic ? 'italic' : 'normal';
+    content.style.color = anno.color;
 
     if (state.editingId !== anno.id) {
-      el.textContent = anno.content;
+      content.textContent = anno.content;
     }
     el.classList.toggle('is-selected', state.selected?.annoId === anno.id);
     el.classList.toggle('is-editing', state.editingId === anno.id);
   }
 
-  function bindTextAnnoEvents (el) {
+  function bindTextAnnoEvents (el, content) {
     let down = null;
+    let resize = null;
 
-    el.addEventListener('mousedown', e => {
+    content.addEventListener('mousedown', e => {
       const pageIndex = +el.dataset.pageIndex;
       const annoId = el.dataset.id;
 
@@ -841,7 +873,7 @@
       e.preventDefault();
     });
 
-    el.addEventListener('dblclick', e => {
+    content.addEventListener('dblclick', e => {
       if (state.tool !== 'select') return;
       const pageIndex = +el.dataset.pageIndex;
       const annoId = el.dataset.id;
@@ -849,7 +881,55 @@
       e.stopPropagation();
     });
 
+    // Poignées de redimensionnement — ne touchent que la largeur (comme un
+    // texte "auto height" dans Figma) ; les poignées côté gauche déplacent
+    // aussi x pour garder le bord droit fixe.
+    el.querySelectorAll('.text-anno__handle').forEach(handle => {
+      handle.addEventListener('mousedown', e => {
+        if (state.tool !== 'select') return;
+        const pageIndex = +el.dataset.pageIndex;
+        const annoId = el.dataset.id;
+        const page = state.pages[pageIndex];
+        const anno = getAnno({ pageIndex, annoId });
+        if (!anno) return;
+
+        resize = {
+          dir: handle.dataset.handle,
+          startMx: e.clientX,
+          origWidth: anno.width,
+          origX: anno.x,
+          moved: false,
+          pageIndex,
+          annoId,
+          rect: page.overlay.getBoundingClientRect(),
+          pageW: page.width,
+        };
+        e.stopPropagation();
+        e.preventDefault();
+      });
+    });
+
     const onMove = (e) => {
+      if (resize) {
+        const dx = (e.clientX - resize.startMx) * (resize.pageW / resize.rect.width);
+        if (!resize.moved && Math.abs(dx) > 1) {
+          resize.moved = true;
+          pushHistory();
+        }
+        if (!resize.moved) return;
+        const anno = getAnno({ pageIndex: resize.pageIndex, annoId: resize.annoId });
+        if (!anno) return;
+        if (resize.dir.includes('w')) {
+          const newWidth = clamp(resize.origWidth - dx, MIN_TEXT_WIDTH, resize.origX + resize.origWidth);
+          anno.x = resize.origX + (resize.origWidth - newWidth);
+          anno.width = newWidth;
+        } else {
+          anno.width = clamp(resize.origWidth + dx, MIN_TEXT_WIDTH, resize.pageW - resize.origX);
+        }
+        renderTextAnno(state.pages[resize.pageIndex], anno);
+        return;
+      }
+
       if (!down) return;
       const dx = (e.clientX - down.startMx) * (down.pageW / down.rect.width);
       const dy = (e.clientY - down.startMy) * (down.pageH / down.rect.height);
@@ -866,6 +946,7 @@
 
     const onUp = () => {
       down = null;
+      resize = null;
     };
 
     window.addEventListener('mousemove', onMove);
@@ -877,12 +958,13 @@
     const page = state.pages[pageIndex];
     const el = page.overlay.querySelector(`[data-id="${annoId}"]`);
     if (!el) return;
+    const content = el.querySelector('.text-anno__content');
     el.classList.add('is-editing');
-    el.setAttribute('contenteditable', 'plaintext-only');
-    el.focus();
+    content.setAttribute('contenteditable', 'plaintext-only');
+    content.focus();
     // Placer le curseur en fin de texte
     const range = document.createRange();
-    range.selectNodeContents(el);
+    range.selectNodeContents(content);
     range.collapse(false);
     const sel = window.getSelection();
     sel.removeAllRanges();
@@ -896,12 +978,13 @@
     const page = state.pages[sel.pageIndex];
     const el = page.overlay.querySelector(`[data-id="${state.editingId}"]`);
     if (!el) { state.editingId = null; return; }
+    const content = el.querySelector('.text-anno__content');
     const anno = getAnno(sel);
     if (anno) {
-      anno.content = el.textContent;
+      anno.content = content.textContent;
     }
     el.classList.remove('is-editing');
-    el.removeAttribute('contenteditable');
+    content.removeAttribute('contenteditable');
     state.editingId = null;
 
     // Si le texte est vide, supprimer la zone
@@ -1092,7 +1175,7 @@
     if (state.editingId) {
       const el = document.querySelector(`.text-anno[data-id="${state.editingId}"]`);
       el?.classList.remove('is-editing');
-      el?.removeAttribute('contenteditable');
+      el?.querySelector('.text-anno__content')?.removeAttribute('contenteditable');
       state.editingId = null;
     }
     state.selected = null;
@@ -1125,7 +1208,16 @@
     setTool(state.tool);
   }
 
-  // ---------- Export PDF (composite canvas → image → pdf-lib) ------------
+  // ---------- Export PDF (pages recopiées en vectoriel + annotations natives) --
+  //
+  // Le contenu d'origine (texte, images, vecteurs du PDF source) est recopié
+  // tel quel via pdf-lib (copyPages) au lieu d'être rasterisé sur un canvas
+  // d'aperçu — c'est ce qui causait la perte de qualité après fusion/édition.
+  // Les annotations (texte, tracés) sont dessinées en tant qu'objets PDF
+  // natifs (drawText / drawLine), donc résolution-indépendantes elles aussi.
+  // Seul cas particulier : une page pivotée (/Rotate) qui porte des
+  // annotations repasse par l'ancien rendu raster, le repositionnement
+  // vectoriel fiable sur page pivotée n'étant pas géré.
 
   async function exportPDF () {
     if (state.pages.length === 0) return;
@@ -1134,8 +1226,9 @@
     $('btn-export').disabled = true;
     $('btn-export').textContent = 'Export…';
 
-    // Assure que les fonts Switzer / Zodiak sont chargées avant que canvas
-    // ne les utilise — sinon canvas tombe en fallback système.
+    // Assure que les fonts Switzer / Zodiak sont chargées avant qu'un
+    // éventuel repli canvas ne les utilise — sinon canvas tombe en
+    // fallback système.
     try {
       await Promise.all([
         document.fonts.load('400 18px "Switzer"'),
@@ -1147,37 +1240,48 @@
     try {
       const { PDFDocument } = window.PDFLib;
       const pdfDoc = await PDFDocument.create();
+      const fontCache = {};
 
-      for (const page of state.pages) {
-        // Composer le canvas final : PDF + strokes + texts
-        const out = document.createElement('canvas');
-        out.width = page.width;
-        out.height = page.height;
-        const ctx = out.getContext('2d');
+      let srcDoc = null;
+      if (sourcePdfBytes) {
+        try {
+          srcDoc = await PDFDocument.load(sourcePdfBytes, { ignoreEncryption: true });
+        } catch {
+          srcDoc = null; // source illisible → repli raster page par page
+        }
+      }
 
-        // 1. Copier le rendu de la page (PDF rasterisé ou blanc)
-        ctx.drawImage(page.canvas, 0, 0);
+      for (let i = 0; i < state.pages.length; i++) {
+        const page = state.pages[i];
 
-        // 2. Strokes (dessins) — dans l'ordre des annotations
-        for (const a of page.annotations) {
-          if (a.type === 'stroke') drawStrokeToCtx(ctx, a);
+        if (srcDoc && i < srcDoc.getPageCount()) {
+          const [copied] = await pdfDoc.copyPages(srcDoc, [i]);
+          const rotated = copied.getRotation().angle !== 0;
+          if (rotated && page.annotations.length > 0) {
+            await rasterizePageIntoDoc(pdfDoc, page);
+            continue;
+          }
+          const pdfPage = pdfDoc.addPage(copied);
+          try {
+            await drawAnnotationsVector(pdfPage, page, pdfDoc, fontCache);
+          } catch {
+            // Ex : caractère non supporté par les fonts standard PDF →
+            // repli raster pour cette page uniquement, le reste du document
+            // garde son export vectoriel.
+            pdfDoc.removePage(pdfDoc.getPageCount() - 1);
+            await rasterizePageIntoDoc(pdfDoc, page);
+          }
+          continue;
         }
 
-        // 3. Texts — par-dessus
-        for (const a of page.annotations) {
-          if (a.type === 'text') drawTextToCtx(ctx, a);
-        }
-
-        const pngBytes = await new Promise(resolve => {
-          out.toBlob(blob => blob.arrayBuffer().then(resolve), 'image/png');
-        });
-        const img = await pdfDoc.embedPng(pngBytes);
+        // Page vierge (pas de PDF source) : page pdf-lib native, 100% vectorielle
         const pdfPage = pdfDoc.addPage([page.pdfWidth, page.pdfHeight]);
-        pdfPage.drawImage(img, {
-          x: 0, y: 0,
-          width: page.pdfWidth,
-          height: page.pdfHeight,
-        });
+        try {
+          await drawAnnotationsVector(pdfPage, page, pdfDoc, fontCache);
+        } catch {
+          pdfDoc.removePage(pdfDoc.getPageCount() - 1);
+          await rasterizePageIntoDoc(pdfDoc, page);
+        }
       }
 
       const bytes = await pdfDoc.save();
@@ -1192,6 +1296,132 @@
       $('btn-export').disabled = false;
       $('btn-export').textContent = 'Exporter';
     }
+  }
+
+  // ---------- Annotations vectorielles (dessinées directement dans le PDF) --
+
+  function hexToRgb01 (hex) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '#000000');
+    if (!m) return [0, 0, 0];
+    return [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255];
+  }
+
+  const STANDARD_FONT_VARIANTS = {
+    sans: { regular: 'Helvetica', bold: 'HelveticaBold', italic: 'HelveticaOblique', boldItalic: 'HelveticaBoldOblique' },
+    serif: { regular: 'TimesRoman', bold: 'TimesRomanBold', italic: 'TimesRomanItalic', boldItalic: 'TimesRomanBoldItalic' },
+  };
+
+  async function getStandardFont (pdfDoc, fontCache, family, weight, italic) {
+    const bold = weight >= 600;
+    const variant = bold && italic ? 'boldItalic' : bold ? 'bold' : italic ? 'italic' : 'regular';
+    const key = STANDARD_FONT_VARIANTS[family === 'serif' ? 'serif' : 'sans'][variant];
+    if (!fontCache[key]) {
+      const { StandardFonts } = window.PDFLib;
+      fontCache[key] = await pdfDoc.embedFont(StandardFonts[key]);
+    }
+    return fontCache[key];
+  }
+
+  function wrapTextForFont (font, text, maxWidthPt, fontSizePt) {
+    const out = [];
+    text.split('\n').forEach(paragraph => {
+      const words = paragraph.split(' ');
+      let line = '';
+      for (const w of words) {
+        const test = line ? `${line} ${w}` : w;
+        if (font.widthOfTextAtSize(test, fontSizePt) > maxWidthPt && line) {
+          out.push(line);
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      out.push(line);
+    });
+    return out;
+  }
+
+  async function drawTextVector (pdfPage, anno, page, pdfDoc, fontCache) {
+    if (!anno.content) return;
+    const { rgb } = window.PDFLib;
+    const font = await getStandardFont(pdfDoc, fontCache, anno.font, anno.weight, anno.italic);
+    const scale = page.scale;
+    const fontSizePt = anno.size / scale;
+    const maxWidthPt = anno.width / scale;
+    const lineHeightCanvas = anno.size * 1.3;
+    const ascentPt = font.heightAtSize(fontSizePt, { descender: false });
+    const [r, g, b] = hexToRgb01(anno.color);
+
+    const lines = wrapTextForFont(font, anno.content, maxWidthPt, fontSizePt);
+    const xPt = (anno.x + 4) / scale;
+    lines.forEach((line, i) => {
+      if (!line) return;
+      const yCanvasTop = anno.y + 2 + i * lineHeightCanvas;
+      const yTopPt = page.pdfHeight - yCanvasTop / scale;
+      pdfPage.drawText(line, { x: xPt, y: yTopPt - ascentPt, size: fontSizePt, font, color: rgb(r, g, b) });
+    });
+  }
+
+  function drawStrokeVector (pdfPage, stroke, page) {
+    if (!stroke.points || stroke.points.length === 0) return;
+    const { rgb, LineCapStyle } = window.PDFLib;
+    const [r, g, b] = hexToRgb01(stroke.color);
+    const scale = page.scale;
+    const toPt = (p) => ({ x: p.x / scale, y: page.pdfHeight - p.y / scale });
+    const thickness = Math.max(0.1, stroke.size / scale);
+    const color = rgb(r, g, b);
+
+    if (stroke.points.length === 1) {
+      const p = toPt(stroke.points[0]);
+      pdfPage.drawLine({ start: p, end: p, thickness, color, lineCap: LineCapStyle.Round });
+      return;
+    }
+    for (let i = 1; i < stroke.points.length; i++) {
+      pdfPage.drawLine({
+        start: toPt(stroke.points[i - 1]),
+        end: toPt(stroke.points[i]),
+        thickness,
+        color,
+        lineCap: LineCapStyle.Round,
+      });
+    }
+  }
+
+  async function drawAnnotationsVector (pdfPage, page, pdfDoc, fontCache) {
+    for (const a of page.annotations) {
+      if (a.type === 'stroke') drawStrokeVector(pdfPage, a, page);
+    }
+    for (const a of page.annotations) {
+      if (a.type === 'text') await drawTextVector(pdfPage, a, page, pdfDoc, fontCache);
+    }
+  }
+
+  // ---------- Repli raster (page pivotée + annotations, cas rare) ---------
+  //
+  // Historique : composite canvas (rendu PDF + strokes + textes) → PNG
+  // embarqué dans une page pdf-lib. Perd en résolution, donc utilisé
+  // uniquement quand le placement vectoriel des annotations n'est pas fiable.
+
+  async function rasterizePageIntoDoc (pdfDoc, page) {
+    const out = document.createElement('canvas');
+    out.width = page.width;
+    out.height = page.height;
+    const ctx = out.getContext('2d');
+
+    ctx.drawImage(page.canvas, 0, 0);
+    for (const a of page.annotations) {
+      if (a.type === 'stroke') drawStrokeToCtx(ctx, a);
+    }
+    for (const a of page.annotations) {
+      if (a.type === 'text') drawTextToCtx(ctx, a);
+    }
+
+    const pngBytes = await new Promise(resolve => {
+      out.toBlob(blob => blob.arrayBuffer().then(resolve), 'image/png');
+    });
+    const img = await pdfDoc.embedPng(pngBytes);
+    const pdfPage = pdfDoc.addPage([page.pdfWidth, page.pdfHeight]);
+    pdfPage.drawImage(img, { x: 0, y: 0, width: page.pdfWidth, height: page.pdfHeight });
   }
 
   function drawStrokeToCtx (ctx, stroke) {
