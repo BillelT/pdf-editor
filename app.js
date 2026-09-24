@@ -57,7 +57,36 @@
     bindModeTabs();
     bindMergePanel();
     bindCompressPanel();
+    bindHelpPopover();
     updateUI();
+  }
+
+  // ---------- Bulle d'aide (raccourcis, footer) ---------------------------
+
+  function bindHelpPopover () {
+    const btn = $('btn-help');
+    const panel = $('help-panel');
+    if (!btn || !panel) return;
+
+    const close = () => {
+      panel.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    const open = () => {
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+    };
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (panel.hidden) open(); else close();
+    });
+    document.addEventListener('click', e => {
+      if (!panel.hidden && e.target !== btn && !panel.contains(e.target) && !btn.contains(e.target)) close();
+    });
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !panel.hidden) close();
+    });
   }
 
   // ---------- Mode (Éditeur / Fusion / Compresser) ------------------------

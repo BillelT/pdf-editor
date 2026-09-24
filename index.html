@@ -137,19 +137,6 @@
         <p class="panel__hint">Clique sur un élément pour le supprimer.</p>
       </section>
 
-      <!-- Raccourcis -->
-      <section class="editor__section">
-        <h2 class="editor__label">Raccourcis</h2>
-        <ul class="kbd-list">
-          <li><kbd>V</kbd> Sélection</li>
-          <li><kbd>T</kbd> Texte</li>
-          <li><kbd>P</kbd> Stylo</li>
-          <li><kbd>E</kbd> Gomme</li>
-          <li><kbd>⌫</kbd> Supprimer</li>
-          <li><kbd>⌘</kbd>+<kbd>Z</kbd> Annuler</li>
-        </ul>
-      </section>
-
       <!-- Actions de fin (dans le body, ordre soutien → principal) -->
       <div class="editor__actions">
         <div class="editor__actions-row">
@@ -227,11 +214,31 @@
 
     </div>
 
-    <!-- Footer fixe : statut + crédit (liens obligatoires b-editor) -->
+    <!-- Footer fixe : statut + aide raccourcis + crédit (liens obligatoires b-editor) -->
     <footer class="editor__foot">
       <p class="editor__credit">
         <b id="status-tool">Outil : Sélection</b> — <span id="status-pages">Aucune page</span>
       </p>
+
+      <div class="editor__toggles">
+        <div class="help-popover">
+          <button type="button" class="btn-ghost help-trigger" id="btn-help" aria-expanded="false" aria-controls="help-panel">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Raccourcis
+          </button>
+          <div class="help-panel" id="help-panel" role="dialog" aria-label="Raccourcis clavier" hidden>
+            <ul class="kbd-list">
+              <li><kbd>V</kbd> Sélection</li>
+              <li><kbd>T</kbd> Texte</li>
+              <li><kbd>P</kbd> Stylo</li>
+              <li><kbd>E</kbd> Gomme</li>
+              <li><kbd>⌫</kbd> Supprimer</li>
+              <li><kbd>⌘</kbd>+<kbd>Z</kbd> Annuler</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <p class="editor__credit">
         un outil PDF Editor par <a class="text-link" href="https://billeltighidet.fr" target="_blank" rel="noopener">Billel</a> — <a class="text-link" href="https://x.com/billel_tighidet" target="_blank" rel="noopener noreferrer">@billel_tighidet</a>
       </p>
