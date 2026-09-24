@@ -55,14 +55,29 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6 6h10"/><path d="M21 11L13 3 3 13l6 6 12-12-1.5-1.5z"/></svg>
             <span class="tool-btn__kbd">E</span>
           </button>
+          <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
+            <span class="tool-btn__kbd">R</span>
+          </button>
+          <button class="tool-btn" data-tool="ellipse" title="Ellipse (O)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="8" ry="6"/></svg>
+            <span class="tool-btn__kbd">O</span>
+          </button>
+          <button class="tool-btn" data-tool="line" title="Ligne (L)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/></svg>
+            <span class="tool-btn__kbd">L</span>
+          </button>
         </nav>
       </section>
 
-      <!-- Panel contextuel : Sélection -->
+      <!-- Panel contextuel : Sélection (son contenu est généré dynamiquement
+           selon la sélection courante : hint vide, réglages contextuels
+           texte/shape, X/Y/W/H, align/distribute…) -->
       <section class="editor__section" id="panel-select">
         <h2 class="editor__label">Sélection</h2>
-        <p class="panel__hint">Clique sur un élément pour le sélectionner. Glisse pour déplacer. <kbd>Suppr</kbd> pour effacer.</p>
-        <div id="panel-selected"></div>
+        <div id="panel-selected">
+          <p class="panel__hint">Clique sur un élément pour le sélectionner. Glisse pour déplacer. Glisse dans le vide pour une sélection multiple. <kbd>Suppr</kbd> pour effacer.</p>
+        </div>
       </section>
 
       <!-- Panel contextuel : Texte -->
@@ -137,6 +152,38 @@
         <p class="panel__hint">Clique sur un élément pour le supprimer.</p>
       </section>
 
+      <!-- Panel contextuel : Shapes (rectangle / ellipse / ligne) -->
+      <section class="editor__section is-hidden" id="panel-shape">
+        <h2 class="editor__label">Forme</h2>
+        <p class="panel__hint">Glisse sur la page pour créer une forme. <kbd>Shift</kbd> contraint, <kbd>Alt</kbd> dessine depuis le centre.</p>
+        <div class="field">
+          <label class="field-label" for="shape-fill">Remplissage</label>
+          <div class="palette">
+            <input id="shape-fill" type="color" value="#f06800" />
+            <label class="check">
+              <span class="switch"><input id="shape-fill-none" type="checkbox"><span class="slider"></span></span>
+              Aucun
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="shape-stroke">Contour</label>
+          <input id="shape-stroke" type="color" value="#120f0d" />
+        </div>
+        <div class="field">
+          <label class="slider-label" for="shape-stroke-width">Épaisseur<span class="field-value" id="shape-stroke-width-val">2</span></label>
+          <input id="shape-stroke-width" type="range" min="0" max="24" value="2" />
+        </div>
+        <div class="field" id="shape-radius-field">
+          <label class="slider-label" for="shape-radius">Rayon des coins<span class="field-value" id="shape-radius-val">0</span></label>
+          <input id="shape-radius" type="range" min="0" max="80" value="0" />
+        </div>
+        <div class="field">
+          <label class="slider-label" for="shape-opacity">Opacité<span class="field-value" id="shape-opacity-val">100</span></label>
+          <input id="shape-opacity" type="range" min="0" max="100" value="100" />
+        </div>
+      </section>
+
       <!-- Raccourcis -->
       <section class="editor__section">
         <h2 class="editor__label">Raccourcis</h2>
@@ -145,8 +192,18 @@
           <li><kbd>T</kbd> Texte</li>
           <li><kbd>P</kbd> Stylo</li>
           <li><kbd>E</kbd> Gomme</li>
+          <li><kbd>R</kbd> Rectangle</li>
+          <li><kbd>O</kbd> Ellipse</li>
+          <li><kbd>L</kbd> Ligne</li>
           <li><kbd>⌫</kbd> Supprimer</li>
+          <li><kbd>⌘</kbd>+<kbd>D</kbd> Dupliquer</li>
+          <li><kbd>⌘</kbd>+<kbd>C</kbd>/<kbd>V</kbd> Copier/coller</li>
           <li><kbd>⌘</kbd>+<kbd>Z</kbd> Annuler</li>
+          <li><kbd>⌘⇧</kbd>+<kbd>Z</kbd> Rétablir</li>
+          <li><kbd>⌥</kbd>+glisser Dupliquer en déplaçant</li>
+          <li><kbd>⇧</kbd>+glisser Contraindre l'axe</li>
+          <li><kbd>Espace</kbd>+glisser Déplacer la vue</li>
+          <li><kbd>⌘</kbd>+<kbd>0</kbd> Zoom 100 %</li>
         </ul>
       </section>
 
@@ -240,7 +297,9 @@
 
   <!-- ============ Canvas (à droite de l'éditeur) ============ -->
   <section class="editor__canvas editor__canvas--scroll" id="canvas-zone">
-    <div id="pages" class="pages"></div>
+    <div id="pages-viewport" class="pages-viewport">
+      <div id="pages" class="pages"></div>
+    </div>
 
     <!-- État vide -->
     <div id="empty-state" class="empty-state">
@@ -255,6 +314,14 @@
         <button id="btn-merge-2" class="btn btn-tiertary">Fusionner des PDF</button>
       </div>
     </div>
+
+    <!-- Barre de zoom (flottante, coin bas-droit du canvas) -->
+    <div class="zoom-bar is-hidden" id="zoom-bar">
+      <button id="zoom-out" class="zoom-bar__btn" title="Zoom arrière (Ctrl/Cmd -)">−</button>
+      <button id="zoom-reset" class="zoom-bar__display" title="Zoom 100 % (Ctrl/Cmd 0)">100%</button>
+      <button id="zoom-in" class="zoom-bar__btn" title="Zoom avant (Ctrl/Cmd +)">+</button>
+      <button id="zoom-fit" class="zoom-bar__btn zoom-bar__btn--wide" title="Ajuster à la page">Fit</button>
+    </div>
   </section>
 </div>
 
@@ -267,7 +334,7 @@
   window.dispatchEvent(new Event('pdfjs-ready'));
 </script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="./app.js" defer></script>
+<script type="module" src="./app.js"></script>
 
 </body>
 </html>

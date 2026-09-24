@@ -391,12 +391,72 @@ kbd {
 
 /* ---------- Pages -------------------------------------------------------- */
 
+/* .pages-viewport = boîte "sizer" dont JS fixe explicitement la taille
+   (taille naturelle × zoom) pour que le scroll de .editor__canvas--scroll
+   corresponde à ce qui est peint. .pages garde sa taille naturelle
+   (jamais affectée par un transform ancêtre) et se met à l'échelle via
+   `transform: scale(--zoom)` — voir setZoom() dans app.js. */
+.pages-viewport {
+  position: relative;
+}
+
 .pages {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--b-space-24);
+  transform-origin: 0 0;
 }
+
+/* ---------- Zoom bar (flottante, bas-droit du canvas) ------------------- */
+
+.zoom-bar {
+  position: absolute;
+  right: var(--b-space-24);
+  bottom: var(--b-space-24);
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: var(--b-space-4);
+  background: var(--b-surface);
+  border-radius: var(--b-radius-md);
+  box-shadow: var(--b-shadow-raised), 0 4px 16px rgba(18, 15, 13, 0.12);
+  z-index: 20;
+}
+
+.zoom-bar.is-hidden { display: none; }
+
+.zoom-bar__btn,
+.zoom-bar__display {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 0 var(--b-space-8);
+  background: transparent;
+  color: var(--b-ink);
+  border-radius: var(--b-radius-sm);
+  font-size: var(--b-text-sm);
+  font-family: var(--b-font-mono);
+  cursor: pointer;
+  transition: background-color var(--b-duration-fast) var(--b-ease);
+}
+
+.zoom-bar__display {
+  min-width: 48px;
+  font-weight: var(--b-font-medium);
+}
+
+.zoom-bar__btn--wide { min-width: 36px; font-family: var(--b-font-sans); }
+
+.zoom-bar__btn:hover,
+.zoom-bar__display:hover { background: var(--b-surface-muted); }
+
+/* Pan temporaire (Espace maintenu) */
+.editor__canvas--scroll.is-pan-ready { cursor: grab; }
+.editor__canvas--scroll.is-panning { cursor: grabbing; }
+.editor__canvas--scroll.is-pan-ready .page__overlay,
+.editor__canvas--scroll.is-panning .page__overlay { pointer-events: none; }
 
 .page {
   position: relative;
@@ -419,6 +479,36 @@ kbd {
 .page__overlay--text  { cursor: text; }
 .page__overlay--pen   { cursor: crosshair; }
 .page__overlay--erase { cursor: cell; }
+.page__overlay--rect,
+.page__overlay--ellipse,
+.page__overlay--line  { cursor: crosshair; }
+
+/* En sélection/gomme, l'overlay lui-même ne doit PAS capter les clics — il
+   couvre toute la page et, sinon, empêcherait les shapes/tracés du calque
+   SVG en-dessous de recevoir le moindre pointerdown (ils ont leur propre
+   pointer-events explicite, mais l'overlay au-dessus gagnerait quand même
+   le hit-test). Seuls ses enfants qui le demandent explicitement (texte,
+   poignées de sélection) restent cliquables. Le clic "fond de page" (créer
+   une marquee, désélectionner…) est géré par un listener sur `.page`
+   elle-même, qui reçoit l'événement par ricochet dès qu'aucun élément plus
+   spécifique n'a fait stopPropagation(). En mode texte/stylo/forme,
+   l'overlay reste au contraire pleinement cliquable : c'est lui qui doit
+   intercepter uniformément tous les clics (y compris par-dessus un élément
+   existant) pour démarrer une création. */
+.page__overlay--select,
+.page__overlay--erase {
+  pointer-events: none;
+}
+
+/* Curseurs contextuels de secours quand l'overlay ne capte plus le clic en
+   sélection/gomme (le curseur affiché est alors celui de l'élément réel
+   sous le pointeur, `.page` par défaut). */
+.page[data-tool="text"]    { cursor: text; }
+.page[data-tool="pen"]     { cursor: crosshair; }
+.page[data-tool="erase"]   { cursor: cell; }
+.page[data-tool="rect"],
+.page[data-tool="ellipse"],
+.page[data-tool="line"]    { cursor: crosshair; }
 
 .page__svg {
   position: absolute;
@@ -435,20 +525,44 @@ kbd {
   pointer-events: stroke;
 }
 
+/* Shapes (rect / ellipse / ligne) */
+.page__svg .shape-el {
+  pointer-events: all;
+}
+
+.page__svg .shape-el.shape-el--line-hit {
+  stroke: transparent;
+  fill: none;
+}
+
 .page__overlay--erase .page__svg path,
-.page__overlay--select .page__svg path {
+.page__overlay--erase .page__svg .shape-el,
+.page__overlay--select .page__svg path,
+.page__overlay--select .page__svg .shape-el {
   cursor: pointer;
 }
 
-/* En mode pen/text, les annotations existantes laissent passer le clic
-   (pour qu'on puisse démarrer un nouveau tracé / texte par-dessus). */
-.page__overlay--pen  .text-anno,
-.page__overlay--text .text-anno {
+.shape-el.is-selected {
+  filter: drop-shadow(0 0 2px var(--b-accent));
+  outline: none;
+}
+
+/* En mode pen/text/shape, les annotations existantes laissent passer le
+   clic (pour qu'on puisse démarrer un nouveau tracé / texte / forme
+   par-dessus). */
+.page__overlay--pen     .text-anno,
+.page__overlay--text    .text-anno,
+.page__overlay--rect    .text-anno,
+.page__overlay--ellipse .text-anno,
+.page__overlay--line    .text-anno {
   pointer-events: none;
 }
 
-.page__overlay--pen  .page__svg path,
-.page__overlay--text .page__svg path {
+.page__overlay--pen     .page__svg *,
+.page__overlay--text    .page__svg *,
+.page__overlay--rect    .page__svg *,
+.page__overlay--ellipse .page__svg *,
+.page__overlay--line    .page__svg * {
   pointer-events: none;
 }
 
@@ -462,6 +576,7 @@ kbd {
 
 .text-anno {
   position: absolute;
+  pointer-events: auto;
 }
 
 .text-anno__content {
@@ -480,10 +595,6 @@ kbd {
   border-color: var(--b-border);
 }
 
-.text-anno.is-selected .text-anno__content {
-  border-color: var(--b-accent);
-}
-
 .text-anno.is-editing .text-anno__content {
   cursor: text;
   user-select: text;
@@ -494,30 +605,149 @@ kbd {
 .page__overlay--erase .text-anno__content { cursor: cell; }
 .page__overlay--text  .text-anno__content { cursor: text; }
 
-/* Poignées de redimensionnement (largeur) — visibles seulement en mode
-   sélection, sur la boîte sélectionnée et hors édition de texte. */
+/* ---------- Sélection générique (bounding box + poignées) --------------
+   Un seul calque de sélection par page (pas par élément) : plus fidèle à
+   la séparation "rendu / overlay de sélection" et partagé par tous les
+   types (texte, tracé, shape, sélection multiple). Positionné en % comme
+   les text-anno pour rester correct au zoom ; les poignées se
+   contre-mettent à l'échelle via --zoom pour garder une taille d'écran
+   constante. */
 
-.text-anno__handle {
+.selection-box {
   display: none;
+  position: absolute;
+  border: 1.5px solid var(--b-accent);
+  pointer-events: none;
+}
+
+.selection-box.is-active { display: block; }
+.selection-box.is-multi { border-style: solid; }
+
+.selection-handle {
   position: absolute;
   width: 8px;
   height: 8px;
   background: var(--b-white);
   border: 1.5px solid var(--b-accent);
   border-radius: 2px;
-  z-index: 2;
+  pointer-events: all;
+  transform: translate(-50%, -50%) scale(calc(1 / var(--zoom, 1)));
 }
 
-.page__overlay--select .text-anno.is-selected:not(.is-editing) .text-anno__handle {
-  display: block;
+.selection-handle--nw { left: 0%;   top: 0%;   cursor: nwse-resize; }
+.selection-handle--ne { left: 100%; top: 0%;   cursor: nesw-resize; }
+.selection-handle--sw { left: 0%;   top: 100%; cursor: nesw-resize; }
+.selection-handle--se { left: 100%; top: 100%; cursor: nwse-resize; }
+.selection-handle--n  { left: 50%;  top: 0%;   cursor: ns-resize; }
+.selection-handle--s  { left: 50%;  top: 100%; cursor: ns-resize; }
+.selection-handle--w  { left: 0%;   top: 50%;  cursor: ew-resize; }
+.selection-handle--e  { left: 100%; top: 50%;  cursor: ew-resize; }
+
+.selection-box.hide-ns .selection-handle--n,
+.selection-box.hide-ns .selection-handle--s {
+  display: none;
 }
 
-.text-anno__handle--nw { left: 0;  top: 0;   transform: translate(-50%, -50%); cursor: nwse-resize; }
-.text-anno__handle--ne { right: 0; top: 0;   transform: translate(50%, -50%);  cursor: nesw-resize; }
-.text-anno__handle--sw { left: 0;  bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
-.text-anno__handle--se { right: 0; bottom: 0; transform: translate(50%, 50%);  cursor: nwse-resize; }
-.text-anno__handle--w  { left: 0;  top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
-.text-anno__handle--e  { right: 0; top: 50%; transform: translate(50%, -50%);  cursor: ew-resize; }
+.selection-rotate-stem {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 22px;
+  background: var(--b-accent);
+  transform: translate(-50%, -100%) scale(calc(1 / var(--zoom, 1)));
+  transform-origin: bottom center;
+  pointer-events: none;
+}
+
+.selection-rotate-handle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--b-radius-full);
+  background: var(--b-white);
+  border: 1.5px solid var(--b-accent);
+  pointer-events: all;
+  cursor: grab;
+  transform: translate(-50%, calc(-100% - 22px)) scale(calc(1 / var(--zoom, 1)));
+  transform-origin: bottom center;
+}
+
+.selection-box.no-rotate .selection-rotate-handle,
+.selection-box.no-rotate .selection-rotate-stem {
+  display: none;
+}
+
+.rotate-readout {
+  position: absolute;
+  left: 50%;
+  top: -40px;
+  transform: translate(-50%, 0) scale(calc(1 / var(--zoom, 1)));
+  transform-origin: bottom center;
+  padding: 2px 6px;
+  background: var(--b-ink);
+  color: var(--b-white);
+  font-family: var(--b-font-mono);
+  font-size: 11px;
+  border-radius: var(--b-radius-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Rectangle de sélection au glisser (marquee) */
+.marquee-rect {
+  display: none;
+  position: absolute;
+  border: 1px solid var(--b-accent);
+  background: var(--b-accent-20);
+  pointer-events: none;
+}
+
+.marquee-rect.is-active { display: block; }
+
+/* Smart guides (lignes d'alignement temporaires pendant move/resize) */
+.smart-guide {
+  position: absolute;
+  background: var(--b-accent-red);
+  pointer-events: none;
+}
+
+.smart-guide--x { top: 0; bottom: 0; width: 1px; }
+.smart-guide--y { left: 0; right: 0; height: 1px; }
+
+/* ---------- Panneau de sélection contextuel (X/Y/W/H, align/distribute) - */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--b-space-8);
+}
+
+.field-grid input[type="number"] {
+  width: 100%;
+  padding: var(--b-space-6) var(--b-space-8);
+  background: var(--b-surface-muted);
+  border-radius: var(--b-radius-sm);
+  color: var(--b-ink);
+  font-size: var(--b-text-sm);
+  font-family: var(--b-font-mono);
+}
+
+.align-row {
+  display: flex;
+  gap: var(--b-space-4);
+  flex-wrap: wrap;
+}
+
+.merge-item__btn--wide {
+  width: auto;
+  padding: 0 var(--b-space-8);
+  flex: 1 1 auto;
+  font-size: var(--b-text-xs);
+  gap: var(--b-space-4);
+}
 
 /* ---------- Empty state ------------------------------------------------- */
 
