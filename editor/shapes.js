@@ -67,7 +67,7 @@ export function shapeOutlinePoints(anno) {
 export const SHAPE_MIN_SIZE = 2;
 
 export const SHAPE_DEFAULTS = {
-  rect: { fill: '#f0680022', stroke: '#120f0d', strokeWidth: 2, opacity: 1, radius: 0 },
-  ellipse: { fill: '#f0680022', stroke: '#120f0d', strokeWidth: 2, opacity: 1 },
-  line: { fill: 'none', stroke: '#120f0d', strokeWidth: 2, opacity: 1 },
+  rect: { fill: '#f0680022', stroke: '#110f0d', strokeWidth: 2, opacity: 1, radius: 0 },
+  ellipse: { fill: '#f0680022', stroke: '#110f0d', strokeWidth: 2, opacity: 1 },
+  line: { fill: 'none', stroke: '#110f0d', strokeWidth: 2, opacity: 1 },
 };

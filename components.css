@@ -42,7 +42,7 @@
   background-color: var(--b-accent);
 }
 .cta:hover {
-  background-color: var(--b-accent-red);
+  background-color: var(--b-accent-hover);
 }
 
 .btn-secondary {
@@ -193,7 +193,7 @@ select:focus,
     background var(--b-duration);
 }
 .file-upload:hover {
-  border-color: var(--b-gray-900);
+  border-color: var(--b-gray-800);
   color: var(--b-ink);
 }
 
@@ -258,7 +258,7 @@ select:focus,
   font-family: inherit;
   font-size: var(--b-text-xs);
   font-weight: var(--b-font-medium);
-  color: var(--b-text-muted);
+  color: var(--b-text-faint);
   background: transparent;
   border: none;
   border-radius: var(--b-radius-sm);
@@ -373,5 +373,5 @@ input[type="color"] {
   transition: border-color var(--b-duration-fast) var(--b-ease);
 }
 input[type="color"]:hover {
-  border-color: var(--b-gray-600);
+  border-color: var(--b-gray-500);
 }

@@ -294,7 +294,7 @@ kbd {
   background: var(--b-surface);
   border: 1px solid var(--b-border);
   border-radius: var(--b-radius-md);
-  box-shadow: 0 4px 16px rgba(18, 15, 13, 0.12), 0 1px 2px rgba(18, 15, 13, 0.06);
+  box-shadow: 0 4px 16px rgba(17, 15, 13, 0.12), 0 1px 2px rgba(17, 15, 13, 0.06);
 }
 
 .help-panel[hidden] { display: none; }
@@ -452,7 +452,7 @@ kbd {
   padding: var(--b-space-4);
   background: var(--b-surface);
   border-radius: var(--b-radius-md);
-  box-shadow: var(--b-shadow-raised), 0 4px 16px rgba(18, 15, 13, 0.12);
+  box-shadow: var(--b-shadow-raised), 0 4px 16px rgba(17, 15, 13, 0.12);
   z-index: 20;
 }
 
@@ -494,7 +494,7 @@ kbd {
   position: relative;
   background: var(--b-surface);
   border-radius: var(--b-radius-sm);
-  box-shadow: 0 1px 2px rgba(18, 15, 13, 0.06), 0 8px 24px rgba(18, 15, 13, 0.08);
+  box-shadow: 0 1px 2px rgba(17, 15, 13, 0.06), 0 8px 24px rgba(17, 15, 13, 0.08);
   overflow: hidden;
 }
 
@@ -631,7 +631,7 @@ kbd {
   cursor: text;
   user-select: text;
   border-color: var(--b-accent);
-  background: rgba(255, 249, 245, 0.5); /* --b-white à 50% */
+  background: color-mix(in srgb, var(--b-white) 50%, transparent);
 }
 
 .page__overlay--erase .text-anno__content { cursor: cell; }

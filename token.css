@@ -1,15 +1,23 @@
-/* =============================================================================
+/* =============================================================
    Billel — token.css
-   ---------------------------------------------------------------------------
-   Source unique de vérité pour toutes les valeurs du design system perso
-   (b-token) : couleurs, espacement, rayons, typo, ombres, mouvement.
-   Toute interface doit charger ce fichier EN PREMIER, puis référencer
-   var(--b-…). Jamais de valeur « à l'œil ».
-============================================================================= */
+   Design system personnel — design tokens
+   -------------------------------------------------------------
+   Source UNIQUE de vérité des valeurs du DS.
+   Toute interface / tout skill doit charger ce fichier AVANT
+   sa propre feuille de styles, puis référencer var(--b-…).
+
+   Règle d'or : on ne pose JAMAIS une valeur « à l'œil ».
+   Si une valeur n'existe pas ici, c'est qu'elle ne fait pas
+   partie du DS → demander avant d'inventer.
+
+   Palette perso (7 tons de gris + encre/blanc chauds + accent
+   orange). Voir design-tokens.md pour le détail des valeurs et des
+   quelques rôles dérivés faute de ton fourni (dark-mode).
+   ============================================================= */
 
 @font-face {
-  font-family: 'Cabinet Grotesk';
-  src: url('./fonts/CabinetGrotesk-Variable.woff2') format('woff2-variations');
+  font-family: "Cabinet Grotesk";
+  src: url("./fonts/CabinetGrotesk-Variable.woff2") format("woff2-variations");
   font-weight: 400 900;
   font-style: normal;
   font-display: swap;
@@ -58,51 +66,87 @@
      ========================================================= */
 
   /* ---- Primitives neutres (encre + blanc) ---- */
-  --b-black: #120f0d;
-  --b-white: #fff9f5;
-  --b-ink: #120f0d;
+  /* Rampe recalibrée le 2026-10-13 sur la logique de Tailwind stone
+     (interfacecraft.dev) : saturation quasi nulle au blanc, léger orange
+     porté par gray-100, clarté de chaque palier conservée (contrastes
+     inchangés). Valeurs HSL de référence, hex en commentaire pour Figma. */
+  --b-black: hsl(30, 12%, 6%); /* #110f0d · encre pure, anneaux de focus */
+  --b-white: hsl(30, 20%, 98%); /* #fbfaf9 · blanc chaud, surface de base */
+  --b-ink: hsl(30, 12%, 6%); /* #110f0d · encre, TOUT le texte par défaut */
 
-  /* ---- Rampe de gris (5 tons, palette perso — teintés orange marque hue 20-28°) ---- */
-  --b-gray-900: #333231;
-  --b-gray-700: #3b3735;
-  --b-gray-600: #93857d;
-  --b-gray-300: #dcd5d0;
-  --b-gray-100: #f1edeb;
+  /* ---- Rampe de gris (7 tons, palette perso, teintés orange marque hue 18-40°) ---- */
+  /* Nom = clarté HSL : on garde la dizaine de L (arrondie vers le bas) et le palier
+     est son complément à 100, × 10. L 93 → 90 → gray-100 ; L 41 → 40 → gray-600 ;
+     L 22 → 20 → gray-800. Au-dessus de L 95, demi-palier 50 (la dizaine des 90
+     porte trois tons : blanc 98, gray-50 96, gray-100 93). Les trous (300, 700,
+     900) sont des paliers sans usage. */
+  --b-gray-50: hsl(40, 10%, 96%); /* #f6f5f4 · un cran sous la surface : sections, tuiles, figures, survol de ligne (stone-50 d'interfacecraft) */
+  --b-gray-100: hsl(30, 23%, 93%); /* #f1ede9 · fonds discrets (carte claire, tabs, chatbox) */
+  --b-gray-200: hsl(18, 8%, 84%); /* #d9d5d3 · bordures / éléments discrets */
+  --b-gray-400: hsl(24, 6%, 65%); /* #aba5a0 · miroir de gray-600 sur fond sombre ; jamais du texte sur clair (2.34:1) */
+  --b-gray-500: hsl(25, 6%, 53%); /* #8e8680 · bordure hover (input color), seul gris à 3:1 sur la surface */
+  --b-gray-600: hsl(24, 6%, 41%); /* #6f6762 · texte discret, onglet inactif : 5.31:1 sur surface, 4.75:1 sur gray-100 */
+  --b-gray-800: hsl(22, 8%, 22%); /* #3d3734 · texte muté, descriptions, hover sidebar */
 
   /* ---- Rôles de texte ---- */
-  --b-text: var(--b-ink);
-  --b-text-muted: var(--b-gray-700);
-  --b-text-faint: var(--b-gray-700);
-  --b-text-control: var(--b-gray-700);
+  --b-text: var(--b-ink); /* #110f0d — défaut */
+  --b-text-muted: var(
+    --b-gray-800
+  ); /* #3d3734 — descriptions, hints, sous-titres */
+  --b-text-faint: var(
+    --b-gray-600
+  ); /* #6f6762 — kickers, micro-notes, onglet inactif (écart net avec l'encre au survol) */
+  --b-text-control: var(
+    --b-gray-800
+  ); /* bouton ghost, libellés de contrôles */
 
   /* ---- Rôles de surface ---- */
-  --b-surface: var(--b-white);
-  --b-surface-muted: var(--b-gray-100);
-  --b-surface-sunken: var(--b-gray-100);
+  /* Hiérarchie : surface (blanc) → subtle / hover (gray-50) → muted / sunken (gray-100). */
+  --b-surface: var(--b-white); /* #fbfaf9 */
+  --b-surface-subtle: var(
+    --b-gray-50
+  ); /* #f6f5f4 — section de panneau, tuile, figure, en-tête de carte, colonne : posé sur la surface */
+  --b-surface-hover: var(
+    --b-gray-50
+  ); /* #f6f5f4 — survol d'une ligne de liste ou d'une tuile cliquable posée sur la surface */
+  --b-surface-muted: var(
+    --b-gray-100
+  ); /* #f1ede9 — carte claire, état disabled */
+  --b-surface-sunken: var(
+    --b-gray-100
+  ); /* #f1ede9 — fond de tabs, hover du bouton ghost */
 
   /* ---- Rôles de bordure ---- */
-  --b-border: var(--b-gray-300);
-  --b-border-subtle: var(--b-gray-100);
+  --b-border: var(--b-gray-200); /* #d9d5d3 — hairline par défaut */
+  --b-border-subtle: var(
+    --b-gray-100
+  ); /* #f1ede9 — bordure sur surface teintée (carte claire) */
 
-  /* ---- Schéma sombre ---- */
-  --b-dark-surface: var(--b-black);
-  --b-dark-text: var(--b-white);
-  --b-dark-text-muted: #fff9f5a6;
-  --b-dark-border: #fff9f526;
+  /* ---- Schéma sombre (carte sombre, etc.) ---- */
+  /* Règle miroir : sur fond sombre, chaque rôle prend le gris opposé de la rampe
+     (200 ↔ 800, 400 ↔ 600, 500 au centre : les clartés de chaque paire somment à 106).
+     Texte muté 800 → 200, texte discret 600 → 400, bordure 200 → 800. */
+  --b-dark-surface: var(--b-black); /* #110f0d */
+  --b-dark-text: var(--b-white); /* #fbfaf9 */
+  --b-dark-text-muted: var(--b-gray-200); /* #d9d5d3 · miroir de --b-text-muted (gray-800) */
+  --b-dark-text-faint: var(--b-gray-400); /* #aba5a0 · miroir de --b-text-faint (gray-600), 7.85:1 sur l'encre */
+  --b-dark-border: var(--b-gray-800); /* #3d3734 · miroir de --b-border (gray-200) */
 
   /* ---- Accent de marque (orange) ---- */
-  --b-accent: hsl(26, 100%, 47%);
-  --b-accent-40: #f0680066;
-  --b-accent-20: #f0680033;
-  --b-accent-red: #f04000;
+  --b-accent: hsl(26, 100%, 47%); /* #f06800 · orange de marque — CTA */
+  --b-accent-40: hsla(26, 100%, 47%, 0.4); /* #f0680066 · orange de marque à 40% — accents discrets */
+  --b-accent-20: hsla(26, 100%, 47%, 0.2); /* #f0680033 · orange de marque à 20% — surlignage de sélection */
+  --b-accent-red: hsl(16, 100%, 47%); /* #f04000 · orange-red — accent GRAPHIQUE uniquement, jamais un signifiant d'état/interaction */
+  --b-accent-hover: hsl(20, 100%, 62%); /* #ff7e3d · orange éclairci, survol du CTA (encre dessus : 7.56:1) */
 
-  /* ---- Overlays utilitaires ---- */
-  --b-track: rgba(0, 0, 0, 0.08);
-  --b-switch-off: rgba(0, 0, 0, 0.18);
-  --b-scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  /* ---- Overlays utilitaires (pistes / voiles) ---- */
+  --b-track: rgba(0, 0, 0, 0.08); /* piste de slider */
+  --b-switch-off: rgba(0, 0, 0, 0.18); /* piste d'interrupteur OFF */
+  --b-scrollbar-thumb: rgba(0, 0, 0, 0.18); /* pouce de barre de défilement */
 
   /* =========================================================
-     2. ESPACEMENT
+     2. ESPACEMENT  (padding / margin / gap)
+     Échelle 4-based linéarisée — pas de 9/10/11/13/14 en espacement.
      ========================================================= */
   --b-space-2: 2px;
   --b-space-4: 4px;
@@ -120,70 +164,98 @@
   /* =========================================================
      3. RAYONS
      ========================================================= */
-  --b-radius-2xs: 2px;
-  --b-radius-xs: 4px;
-  --b-radius-sm: 6px;
-  --b-radius-md: 8px;
-  --b-radius-lg: 32px;
-  --b-radius-full: 9999px;
+  --b-radius-2xs: 2px; /* focus de lien, piste de slider */
+  --b-radius-xs: 4px; /* bouton ghost */
+  --b-radius-sm: 6px; /* onglet, swatch couleur */
+  --b-radius-md: 8px; /* défaut : boutons, champs, select, tabs, upload */
+  --b-radius-lg: 32px; /* carte */
+  --b-radius-full: 9999px; /* pastille, interrupteur (totalement arrondi) */
 
   /* =========================================================
      4. TYPOGRAPHIE
      ========================================================= */
-  --b-font-sans: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* ---- Familles ---- */
+  --b-font-sans:
+    "Cabinet Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --b-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --b-text-xs: 12px;
-  --b-text-sm: 14px;
-  --b-text-base: 16px;
-  --b-text-lg: 18px;
-  --b-text-xl: 20px;
-  --b-text-3xl: 36px;
-  --b-text-6xl: 72px;
+  /* ---- Tailles ---- */
+  --b-text-xs: 12px; /* méta, hints, pills, contrôles */
+  --b-text-sm: 14px; /* liens nav, champs, libellés */
+  --b-text-base: 16px; /* corps, CTA, prix /période */
+  --b-text-lg: 18px; /* nom de carte */
+  --b-text-xl: 20px; /* accroche de hero */
+  --b-text-3xl: 36px; /* montant de prix */
+  --b-text-5xl: 48px; /* titre d'affichage hero sous 720px */
+  --b-text-6xl: 58px; /* titre d'affichage hero (72px jugé trop grand le 16 octobre 2026) */
 
+  /* ---- Graisses ---- */
   --b-font-regular: 400;
   --b-font-medium: 500;
   --b-font-semibold: 600;
   --b-font-bold: 700;
 
-  --b-leading-none: 1.02;
-  --b-leading-tight: 1.2;
-  --b-leading-snug: 1.333;
-  --b-leading-normal: 1.4;
-  --b-leading-relaxed: 1.5;
+  /* ---- Interlignes ---- */
+  --b-leading-none: 1.02; /* titre d'affichage hero */
+  --b-leading-tight: 1.2; /* boutons */
+  --b-leading-snug: 1.333; /* pastille */
+  --b-leading-normal: 1.4; /* champs, hints */
+  --b-leading-relaxed: 1.5; /* corps muté, descriptions, crédits */
 
-  --b-tracking-tight: -0.01em;
-  --b-tracking-tighter: -0.03em;
-  --b-tracking-wide: 0.08em;
+  /* ---- Interlettrage ---- */
+  --b-tracking-tight: -0.01em; /* marque / titre de header */
+  --b-tracking-tighter: -0.03em; /* titre de hero */
+  --b-tracking-wide: 0.08em; /* libellé capitales d'éditeur */
 
-  /* ---- Fonts de contenu (choix de police pour le texte ajouté au PDF) ---- */
+  /* ---- Fonts de contenu (hors DS : choix de police pour le texte ajouté au PDF) ---- */
   --font-content-sans: 'Switzer', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-content-serif: 'Zodiak', Georgia, 'Times New Roman', serif;
 
   /* =========================================================
-     5. OMBRES & FOCUS
+     5. OMBRES & FOCUS  (recettes composites)
      ========================================================= */
+  /* Pas d'ombre sur les boutons (.cta / .btn-secondary / .btn-ghost),
+     dans aucun état — 0 shadow, y compris le halo CTA et le ring
+     secondaire d'origine. Différenciation hover/active uniquement
+     via la couleur de fond / le texte, jamais via shadow. */
+
+  /* Carte surélevée — onglet actif */
   --b-shadow-raised: 0 1px 2px #0000000a;
+
+  /* Interrupteur */
   --b-shadow-switch-track: inset 0 0 0 0.5px rgba(0, 0, 0, 0.1);
   --b-shadow-switch-thumb: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  /* Focus — anneau doux (champs : select, slider) ; standardisé à 3px */
   --b-shadow-focus: 0 0 0 3px rgba(0, 0, 0, 0.1);
+  /* Focus — contour dur (boutons, liens, swatch) */
   --b-focus-outline: 2px solid var(--b-black);
   --b-focus-offset: 2px;
 
   /* =========================================================
      6. MOUVEMENT
      ========================================================= */
-  --b-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --b-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
-  --b-duration-instant: 0.05s;
+  --b-ease: cubic-bezier(0.16, 1, 0.3, 1); /* easing signature */
+  --b-ease-default: cubic-bezier(
+    0.4,
+    0,
+    0.2,
+    1
+  ); /* easing par défaut — remplace le mot-clé `ease` */
+  --b-ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entrées / sorties UI (ease-out fort) */
+  --b-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* déplacement / morphing à l'écran */
+  --b-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* drawers, sheets (courbe façon iOS) */
+  --b-ease-icon: cubic-bezier(0.2, 0, 0, 1); /* changement d'icône / états contextuels */
+  --b-duration-instant: 0.05s; /* press / transform */
   --b-duration-fast: 0.12s;
   --b-duration: 0.15s;
   --b-duration-slow: 0.2s;
 }
 
-/* =============================================================================
-   Base globale — appliquée partout, token.css étant chargé en premier
-============================================================================= */
+/* =============================================================
+   Base globale — appliquée sur tous mes sites
+   (token.css étant chargé partout, ces règles s'appliquent d'office)
+   ============================================================= */
 
 *,
 *::before,
@@ -195,6 +267,9 @@
   background: var(--b-accent-20);
 }
 
+/* Barres de défilement — apparence unifiée sur TOUTE zone scrollable
+   (page entière, sections, panneaux…). Propriétés standard (Firefox,
+   Chromium 121+) sur toute scroll-zone + équivalent WebKit pour Safari. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--b-scrollbar-thumb) transparent;

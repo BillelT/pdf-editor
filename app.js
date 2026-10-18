@@ -49,9 +49,9 @@ import { buildExportedPdfBytes } from './editor/export.js';
     future: [],           // pile redo
     clipboard: [],        // presse-papiers interne — indépendant de la page/du document
     pasteCount: 0,
-    textStyle: { font: 'sans', size: 18, weight: 400, italic: false, color: '#120f0d' },
-    penStyle: { color: '#120f0d', size: 3 },
-    shapeStyle: { fill: SHAPE_DEFAULTS.rect.fill, stroke: '#120f0d', strokeWidth: 2, opacity: 1, radius: 0 },
+    textStyle: { font: 'sans', size: 18, weight: 400, italic: false, color: '#110f0d' },
+    penStyle: { color: '#110f0d', size: 3 },
+    shapeStyle: { fill: SHAPE_DEFAULTS.rect.fill, stroke: '#110f0d', strokeWidth: 2, opacity: 1, radius: 0 },
     drawing: null,        // stroke en cours { pageIndex, strokeId }
     editingId: null,      // id de la text-anno en édition
     zoom: 1,
@@ -2042,7 +2042,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
       </div>
       <div class="field">
         <label class="field-label">Contour</label>
-        <input type="color" id="sel-shape-stroke" value="${single.stroke && single.stroke !== 'none' ? single.stroke : '#120f0d'}">
+        <input type="color" id="sel-shape-stroke" value="${single.stroke && single.stroke !== 'none' ? single.stroke : '#110f0d'}">
       </div>
       <div class="field">
         <label class="slider-label">Épaisseur<span class="field-value" id="sel-shape-stroke-width-val">${single.strokeWidth}</span></label>
