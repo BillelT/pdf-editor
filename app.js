@@ -2,7 +2,9 @@
    PDF Editor — logique principale
    ---------------------------------------------------------------------------
    - Outils : V (sélection), T (texte), P (stylo), E (gomme),
-     R (rectangle), O (ellipse), L (ligne)
+     R (rectangle), O (ellipse), L (ligne), X (texte d'origine)
+   - Pages : suppression (marquées `deleted`, annulable, ignorées à l'export) ;
+     texte d'origine retiré du flux PDF — voir editor/source-text.js.
    - Annotations stockées par page dans `state.pages[i].annotations`, sous une
      forme commune {id,type,x,y,...} — voir editor/geometry.js pour le calque
      de transform générique (move/resize/rotate) partagé par tous les types.
@@ -17,6 +19,7 @@ import {
 import { computeSnap } from './editor/snapping.js';
 import { shapeOutlinePoints, SHAPE_DEFAULTS } from './editor/shapes.js';
 import { buildExportedPdfBytes } from './editor/export.js';
+import { removeSourceText, textItemBox } from './editor/source-text.js';
 
 (() => {
 
@@ -65,6 +68,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
   // recopier les pages en vectoriel à l'export plutôt que repartir du rendu
   // canvas basse résolution.
   let sourcePdfBytes = null;
+  let sourceLibDoc = null; // PDFDocument pdf-lib du source, chargé à la demande
 
   const $ = (id) => document.getElementById(id);
 
@@ -135,7 +139,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
   // ---------- Toolbar ------------------------------------------------------
 
   const SHAPE_TOOLS = ['rect', 'ellipse', 'line'];
-  const PANEL_TOOLS = ['select', 'text', 'pen', 'erase'];
+  const PANEL_TOOLS = ['select', 'text', 'pen', 'erase', 'source-text'];
 
   function bindToolbar () {
     document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -160,12 +164,14 @@ import { buildExportedPdfBytes } from './editor/export.js';
       p.el.dataset.tool = tool;
     });
     $('status-tool').textContent = `Outil : ${toolLabel(tool)}`;
+    if (tool === 'source-text') state.pages.forEach(p => ensureSourceTextLayer(p));
   }
 
   function toolLabel (t) {
     return {
       select: 'Sélection', text: 'Texte', pen: 'Stylo', erase: 'Gomme',
       rect: 'Rectangle', ellipse: 'Ellipse', line: 'Ligne',
+      'source-text': "Texte d'origine",
     }[t];
   }
 
@@ -232,6 +238,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
         case 'r': setTool('rect'); return;
         case 'o': setTool('ellipse'); return;
         case 'l': setTool('line'); return;
+        case 'x': setTool('source-text'); return;
         case 'escape':
           if (state.editingId) commitEditing();
           else clearSelection();
@@ -443,9 +450,10 @@ import { buildExportedPdfBytes } from './editor/export.js';
   // block-level) — parent qui est justement redimensionné selon le zoom, donc
   // le mesurer directement bouclerait sur lui-même (double application du zoom).
   function pagesNaturalSize () {
-    if (state.pages.length === 0) return { width: 0, height: 0 };
-    const width = Math.max(...state.pages.map(p => p.width));
-    const height = state.pages.reduce((sum, p) => sum + p.height, 0) + PAGE_GAP * (state.pages.length - 1);
+    const pages = visiblePages();
+    if (pages.length === 0) return { width: 0, height: 0 };
+    const width = Math.max(...pages.map(p => p.width));
+    const height = pages.reduce((sum, p) => sum + p.height, 0) + PAGE_GAP * (pages.length - 1);
     return { width, height };
   }
 
@@ -560,13 +568,14 @@ import { buildExportedPdfBytes } from './editor/export.js';
     resetPages();
     for (let i = 1; i <= pdf.numPages; i++) {
       const pdfPage = await pdf.getPage(i);
-      await renderPage(pdfPage);
+      await renderPage(pdfPage, i - 1);
     }
     afterPagesLoaded();
   }
 
   async function loadBlankPage () {
     sourcePdfBytes = null;
+    sourceLibDoc = null;
     resetPages();
     await renderBlankPage();
     afterPagesLoaded();
@@ -582,6 +591,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
   function resetPages () {
     state.pages.forEach(p => p.el.remove());
     state.pages = [];
+    sourceLibDoc = null;
     state.history = [];
     state.future = [];
     state.selection = { pageIndex: null, ids: new Set() };
@@ -592,10 +602,128 @@ import { buildExportedPdfBytes } from './editor/export.js';
 
   function afterPagesLoaded () {
     $('empty-state').classList.add('is-hidden');
-    $('status-pages').textContent = `${state.pages.length} page${state.pages.length > 1 ? 's' : ''}`;
+    updatePagesStatus();
     $('zoom-bar').classList.toggle('is-hidden', state.mode !== 'edit' || state.pages.length === 0);
     applyZoomLayout();
     setTool(state.tool);
+  }
+
+  function visiblePages () {
+    return state.pages.filter(p => !p.deleted);
+  }
+
+  function updatePagesStatus () {
+    const n = visiblePages().length;
+    $('status-pages').textContent = `${n} page${n > 1 ? 's' : ''}`;
+    state.pages.forEach(p => {
+      p.el.querySelector('.page__delete').hidden = n <= 1;
+    });
+  }
+
+  // ---------- Suppression de pages ------------------------------------------
+
+  function deletePage (page) {
+    if (page.deleted || visiblePages().length <= 1) return;
+    if (state.editingId) commitEditing();
+    pushHistory();
+    const idx = state.pages.indexOf(page);
+    if (state.selection.pageIndex === idx) clearSelection();
+    if (state.activePageIndex === idx) state.activePageIndex = null;
+    setPageDeleted(page, true);
+  }
+
+  function setPageDeleted (page, deleted) {
+    page.deleted = deleted;
+    page.el.classList.toggle('is-deleted', deleted);
+    updatePagesStatus();
+    applyZoomLayout();
+  }
+
+  // ---------- Texte d'origine (suppression dans les données du PDF) --------
+
+  async function ensureSourceTextLayer (page) {
+    if (!page.pdfPage || page.textLayer) return;
+    const layer = document.createElement('div');
+    layer.className = 'src-text-layer';
+    page.textLayer = layer;
+    page.overlay.prepend(layer);
+
+    const content = await page.pdfPage.getTextContent();
+    const viewport = page.pdfPage.getViewport({ scale: page.scale });
+    page.textItems = [];
+    content.items.forEach((item, idx) => {
+      if (!item.str || !item.str.trim()) return;
+      const box = textItemBox(item);
+      const corners = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]]
+        .map(([x, y]) => viewport.convertToViewportPoint(x, y));
+      const xs = corners.map(c => c[0]);
+      const ys = corners.map(c => c[1]);
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'src-text-item';
+      el.title = `Supprimer « ${item.str} »`;
+      el.dataset.idx = idx;
+      el.style.left = `${Math.min(...xs)}px`;
+      el.style.top = `${Math.min(...ys)}px`;
+      el.style.width = `${Math.max(...xs) - Math.min(...xs)}px`;
+      el.style.height = `${Math.max(...ys) - Math.min(...ys)}px`;
+      el.addEventListener('pointerdown', e => e.stopPropagation());
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        removeSourceTextItem(page, idx, box);
+      });
+      layer.appendChild(el);
+      page.textItems.push({ idx, box, el });
+    });
+    refreshSourceTextLayer(page);
+  }
+
+  function refreshSourceTextLayer (page) {
+    if (!page.textItems) return;
+    const removed = new Set(page.removedText.map(r => r.idx));
+    page.textItems.forEach(t => { t.el.hidden = removed.has(t.idx); });
+  }
+
+  function removeSourceTextItem (page, idx, box) {
+    if (page.removedText.some(r => r.idx === idx)) return;
+    pushHistory();
+    page.removedText = [...page.removedText, { idx, box }];
+    refreshSourceTextLayer(page);
+    rerenderSourcePage(page);
+  }
+
+  async function getSourceLibDoc () {
+    if (!sourceLibDoc) {
+      sourceLibDoc = await window.PDFLib.PDFDocument.load(sourcePdfBytes, { ignoreEncryption: true });
+    }
+    return sourceLibDoc;
+  }
+
+  // Re-rend le fond de la page à partir du PDF source modifié (texte retiré),
+  // dans un canvas hors écran pour éviter le clignotement.
+  async function rerenderSourcePage (page) {
+    if (!page.pdfPage) return;
+    const token = (page.renderToken = (page.renderToken || 0) + 1);
+    let pdfPage = page.pdfPage;
+    let tmpDoc = null;
+    if (page.removedText.length) {
+      const { PDFDocument } = window.PDFLib;
+      const one = await PDFDocument.create();
+      const [copied] = await one.copyPages(await getSourceLibDoc(), [page.srcIndex]);
+      one.addPage(copied);
+      removeSourceText(one, one.getPage(0), page.removedText.map(r => r.box));
+      tmpDoc = await window.pdfjsLib.getDocument({ data: await one.save() }).promise;
+      pdfPage = await tmpDoc.getPage(1);
+    }
+    const viewport = pdfPage.getViewport({ scale: page.scale });
+    const off = document.createElement('canvas');
+    off.width = page.canvas.width;
+    off.height = page.canvas.height;
+    await pdfPage.render({ canvasContext: off.getContext('2d'), viewport }).promise;
+    tmpDoc?.destroy();
+    if (token !== page.renderToken) return;
+    page.ctx.clearRect(0, 0, page.canvas.width, page.canvas.height);
+    page.ctx.drawImage(off, 0, 0);
   }
 
   // ---------- Fusion de PDF ------------------------------------------------
@@ -916,7 +1044,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
 
   // ---------- Rendu de page + calque de sélection générique ---------------
 
-  async function renderPage (pdfPage) {
+  async function renderPage (pdfPage, srcIndex) {
     const baseViewport = pdfPage.getViewport({ scale: 1 });
     const targetWidth = Math.min(840, baseViewport.width * 1.2);
     const scale = targetWidth / baseViewport.width;
@@ -933,7 +1061,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
     registerPage({
       width: viewport.width, height: viewport.height,
       pdfWidth: baseViewport.width, pdfHeight: baseViewport.height,
-      scale, pdfPage, el: pageEl, canvas, ctx,
+      scale, pdfPage, srcIndex, el: pageEl, canvas, ctx,
     });
   }
 
@@ -949,7 +1077,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
 
     registerPage({
       width, height, pdfWidth: width, pdfHeight: height,
-      scale: 1, pdfPage: null, el: pageEl, canvas, ctx,
+      scale: 1, pdfPage: null, srcIndex: null, el: pageEl, canvas, ctx,
     });
   }
 
@@ -958,6 +1086,8 @@ import { buildExportedPdfBytes } from './editor/export.js';
     const page = {
       ...base,
       annotations: [],
+      removedText: [],    // [{ idx, box }] — texte d'origine retiré (voir source-text.js)
+      deleted: false,
       overlay: pageEl.querySelector('.page__overlay'),
       svg: pageEl.querySelector('.page__svg'),
       selectionBox: pageEl.querySelector('.selection-box'),
@@ -966,6 +1096,9 @@ import { buildExportedPdfBytes } from './editor/export.js';
     };
     state.pages.push(page);
     bindPageEvents(state.pages.length - 1);
+    const del = pageEl.querySelector('.page__delete');
+    del.addEventListener('pointerdown', e => e.stopPropagation());
+    del.addEventListener('click', e => { e.stopPropagation(); deletePage(page); });
   }
 
   function createPageEl (w, h) {
@@ -985,6 +1118,9 @@ import { buildExportedPdfBytes } from './editor/export.js';
           <div class="selection-rotate-handle" data-handle="rotate"></div>
         </div>
       </div>
+      <button type="button" class="page__delete" title="Supprimer la page" aria-label="Supprimer la page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/></svg>
+      </button>
     `;
     $('pages').appendChild(el);
     return el;
@@ -2156,7 +2292,11 @@ import { buildExportedPdfBytes } from './editor/export.js';
   // ---------- History (undo / redo) ----------------------------------------
 
   function currentSnapshot () {
-    return state.pages.map(p => deepClone(p.annotations));
+    return state.pages.map(p => ({
+      annotations: deepClone(p.annotations),
+      removedText: p.removedText,  // jamais muté en place (remplacé à chaque ajout)
+      deleted: p.deleted,
+    }));
   }
 
   function pushHistory () {
@@ -2186,13 +2326,19 @@ import { buildExportedPdfBytes } from './editor/export.js';
       state.editingId = null;
     }
     state.selection = { pageIndex: null, ids: new Set() };
-    snap.forEach((annos, i) => {
+    snap.forEach(({ annotations: annos, removedText, deleted }, i) => {
       const page = state.pages[i];
       if (!page) return;
       page.overlay.querySelectorAll('.text-anno').forEach(el => el.remove());
       page.svg.querySelectorAll('[data-id]').forEach(el => el.remove());
       page.annotations = annos;
       annos.forEach(a => refreshAnno(page, a));
+      if (page.removedText !== removedText) {
+        page.removedText = removedText;
+        refreshSourceTextLayer(page);
+        rerenderSourcePage(page);
+      }
+      if (page.deleted !== deleted) setPageDeleted(page, deleted);
     });
     updateSelectionBox();
     updateSelectedPanel();
@@ -2222,7 +2368,7 @@ import { buildExportedPdfBytes } from './editor/export.js';
     } catch {}
 
     try {
-      const bytes = await buildExportedPdfBytes(state.pages, sourcePdfBytes);
+      const bytes = await buildExportedPdfBytes(visiblePages(), sourcePdfBytes);
       const blob = new Blob([bytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -528,7 +528,8 @@ kbd {
    intercepter uniformément tous les clics (y compris par-dessus un élément
    existant) pour démarrer une création. */
 .page__overlay--select,
-.page__overlay--erase {
+.page__overlay--erase,
+.page__overlay--source-text {
   pointer-events: none;
 }
 
@@ -583,6 +584,7 @@ kbd {
    clic (pour qu'on puisse démarrer un nouveau tracé / texte / forme
    par-dessus). */
 .page__overlay--pen     .text-anno,
+.page__overlay--source-text .text-anno,
 .page__overlay--text    .text-anno,
 .page__overlay--rect    .text-anno,
 .page__overlay--ellipse .text-anno,
@@ -591,6 +593,7 @@ kbd {
 }
 
 .page__overlay--pen     .page__svg *,
+.page__overlay--source-text .page__svg *,
 .page__overlay--text    .page__svg *,
 .page__overlay--rect    .page__svg *,
 .page__overlay--ellipse .page__svg *,
@@ -829,3 +832,65 @@ kbd {
   gap: var(--b-space-12);
   margin-top: var(--b-space-8);
 }
+
+/* ---------- Suppression de page ----------------------------------------- */
+
+.page.is-deleted { display: none; }
+
+.page__delete {
+  position: absolute;
+  top: var(--b-space-8);
+  right: var(--b-space-8);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--b-surface);
+  color: var(--b-ink);
+  border-radius: var(--b-radius-sm);
+  box-shadow: var(--b-shadow-raised);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--b-duration-fast) var(--b-ease), background-color var(--b-duration-fast) var(--b-ease);
+}
+
+.page__delete svg { width: 16px; height: 16px; }
+
+.page:hover .page__delete,
+.page__delete:focus-visible { opacity: 1; }
+
+.page__delete:hover { background: var(--b-surface-muted); }
+
+@media (hover: none) {
+  .page__delete { opacity: 1; }
+}
+
+/* ---------- Texte d'origine (outil X) ------------------------------------ */
+
+.src-text-layer {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.page__overlay--source-text .src-text-layer { display: block; }
+
+.src-text-item {
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background-color var(--b-duration-fast) var(--b-ease);
+}
+
+.src-text-item:hover,
+.src-text-item:focus-visible {
+  background: color-mix(in oklab, var(--b-accent) 16%, transparent);
+  outline: 1px solid var(--b-accent);
+}
+
+.src-text-item[hidden] { display: none; }

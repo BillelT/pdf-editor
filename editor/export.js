@@ -17,6 +17,7 @@
 ============================================================================= */
 
 import { shapeOutlinePoints } from './shapes.js';
+import { removeSourceText } from './source-text.js';
 
 function hexToRgb01(hex) {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || '#000000');
@@ -293,7 +294,9 @@ async function rasterizePageIntoDoc(pdfDoc, page) {
 
 /**
  * Construit les bytes du PDF exporté à partir des pages de l'éditeur.
- * pages: state.pages (voir app.js) — chaque page a annotations/canvas/scale/pdfWidth/pdfHeight.
+ * pages: pages visibles de state.pages (voir app.js) — chaque page a
+ * annotations/canvas/scale/pdfWidth/pdfHeight, srcIndex (index dans le PDF
+ * source, null pour une page blanche) et removedText (texte d'origine retiré).
  * sourcePdfBytes: bytes du PDF d'origine chargé dans l'éditeur, ou null (page(s) blanche(s)).
  */
 export async function buildExportedPdfBytes(pages, sourcePdfBytes) {
@@ -313,10 +316,11 @@ export async function buildExportedPdfBytes(pages, sourcePdfBytes) {
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
 
-    if (srcDoc && i < srcDoc.getPageCount()) {
-      const [copied] = await pdfDoc.copyPages(srcDoc, [i]);
+    if (srcDoc && page.srcIndex != null && page.srcIndex < srcDoc.getPageCount()) {
+      const [copied] = await pdfDoc.copyPages(srcDoc, [page.srcIndex]);
       const pdfPage = pdfDoc.addPage(copied);
       try {
+        removeSourceText(pdfDoc, pdfPage, (page.removedText || []).map(r => r.box));
         await drawAnnotationsVector(pdfPage, page, pdfDoc, fontCache);
       } catch {
         // Ex : caractère non supporté par les fonts standard PDF → repli
