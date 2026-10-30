@@ -170,7 +170,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     return {
       select: 'Sélection', text: 'Texte', pen: 'Stylo', erase: 'Gomme',
       rect: 'Rectangle', ellipse: 'Ellipse', line: 'Ligne',
-      'source-text': 'Texte du PDF',
+      'source-text': "Texte d'origine",
     }[t];
   }
 
@@ -214,6 +214,12 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       if (!typing && !isMod(e) && e.shiftKey && e.code === 'Digit2') { e.preventDefault(); zoomToSelection(); return; }
 
       if (typing) {
+        if (e.key === 'Escape' && state.editingId) {
+          e.preventDefault();
+          document.activeElement?.blur?.();
+          commitEditing();
+          return;
+        }
         if (isMod(e) && e.key.toLowerCase() === 'a' && state.editingId) {
           e.preventDefault();
           selectAllTextInEditing();
@@ -422,6 +428,9 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     selectedAnnos().forEach(anno => {
       if (anno.type !== 'text') return;
       Object.assign(anno, patch);
+      // Police / graisse / italique choisies à la main : on quitte la police
+      // du PDF pour celle du panneau.
+      if ('font' in patch || 'weight' in patch || 'italic' in patch) anno.cssFont = null;
       renderTextAnno(page, anno);
       changed = true;
     });
@@ -701,7 +710,9 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const italic = /italic|oblique/i.test(hay);
     const serif = /zodiak|serif|times|georgia|garamond|minion|playfair|didot|caslon|bodoni/i.test(hay)
       && !/sans/i.test(hay) && !/^sans/i.test(family);
-    return { weight, italic, font: serif ? 'serif' : 'sans' };
+    let loaded = '';
+    try { loaded = pdfPage.commonObjs.get(item.fontName)?.loadedName || ''; } catch {}
+    return { weight, italic, font: serif ? 'serif' : 'sans', loadedName: loaded };
   }
 
   function buildTextBlocks (page, content) {
@@ -750,7 +761,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       }
       blocks.push({
         id: `b${blocks.length}`, fontName: it.fontName, sizePx: it.sizePx, weight: it.weight,
-        italic: it.italic, font: it.font, items: [it],
+        italic: it.italic, font: it.font, loadedName: it.loadedName, items: [it],
         lines: [{ parts: [it], baseline: it.baseline, left: it.left, right: it.right }],
       });
     });
@@ -768,6 +779,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
           const gap = p.left - ln.parts[j - 1].right;
           return acc + (gap > p.sizePx * 0.12 && !/\s$/.test(acc) && !/^\s/.test(p.str) ? ' ' : '') + p.str;
         }, '');
+        ln.text = lineText;
         if (i === 0) { text = lineText; return; }
         const prev = blk.lines[i - 1];
         text += ((prev.right - blk.left) >= full * 0.9 ? ' ' : '\n') + lineText;
@@ -824,15 +836,24 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'src-text-item';
-      el.title = `Modifier « ${blk.text.replace(/\s+/g, ' ').slice(0, 60)} »`;
-      el.setAttribute('aria-label', `Modifier le texte : ${blk.text.replace(/\s+/g, ' ').slice(0, 60)}`);
+      const label = blk.text.replace(/\s+/g, ' ').slice(0, 60);
+      el.title = `Modifier « ${label} »`;
+      el.setAttribute('aria-label', `Modifier le texte : ${label}`);
       el.style.left = `${blk.left - 2}px`;
       el.style.top = `${blk.top - 1}px`;
       el.style.width = `${blk.right - blk.left + 4}px`;
       el.style.height = `${blk.bottom - blk.top + 2}px`;
       el.addEventListener('pointerdown', e => e.stopPropagation());
-      el.addEventListener('pointerenter', () => el.focus({ preventScroll: true }));
-      el.addEventListener('click', e => { e.stopPropagation(); beginSourceTextEdit(page, blk); });
+      el.addEventListener('pointerenter', () => {
+        const del = state.tool === 'source-text';
+        el.title = `${del ? 'Supprimer' : 'Modifier'} « ${label} »`;
+        if (del) el.focus({ preventScroll: true });
+      });
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        if (state.tool === 'source-text') removeSourceTextBlock(page, blk);
+        else beginSourceTextEdit(page, blk, e);
+      });
       el.addEventListener('keydown', e => {
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
@@ -872,7 +893,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
   // Remplace un bloc du PDF par une annotation texte éditable de même
   // apparence : le texte d'origine quitte le flux PDF, l'annotation prend le
   // relais (déplaçable, restylable, exportée en texte vectoriel).
-  function beginSourceTextEdit (page, blk, caretPoint) {
+  function beginSourceTextEdit (page, blk, evt) {
     if (state.editingId) commitEditing();
     const pageIndex = state.pages.indexOf(page);
     state.activePageIndex = pageIndex;
@@ -880,18 +901,77 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     pushHistory();
     removeSourceTextBlock(page, blk, { history: false });
 
+    // Même police que le PDF quand pdf.js l'a chargée (les glyphes absents du
+    // sous-ensemble retombent sur la police de repli), même taille, couleur,
+    // interligne ; la 1re ligne de base est recalée sur celle de l'original.
+    const generic = blk.font === 'serif' ? 'var(--font-content-serif)' : 'var(--font-content-sans)';
     const anno = {
       id: uid(), type: 'text',
-      x: blk.left - 5, y: blk.top - 3 - Math.max(0, (blk.lineHeight - 1.15) * blk.sizePx / 2),
+      x: blk.left - 5, y: blk.top,
       width: Math.max(MIN_TEXT_WIDTH, blk.right - blk.left + 10 + blk.sizePx * 1.5),
-      content: blk.text, font: blk.font, size: Math.round(blk.sizePx * 10) / 10,
+      content: blk.text, font: blk.font, size: Math.round(blk.sizePx * 100) / 100,
       weight: blk.weight, italic: blk.italic, color: blk.color || '#110f0d',
       lineHeight: Math.round(clamp(blk.lineHeight, 1, 2.2) * 100) / 100,
+      cssFont: blk.loadedName ? `"${blk.loadedName}", ${generic}` : null,
     };
     page.annotations.push(anno);
     renderTextAnno(page, anno);
+    if (anno.baseline != null) {
+      anno.y = blk.lines[0].baseline - anno.baseline;
+      renderTextAnno(page, anno);
+    }
     selectOnly(pageIndex, anno.id);
     startEditing(pageIndex, anno.id);
+    if (evt) placeCaretAtPoint(evt.clientX, evt.clientY);
+    // Après le 1er rendu avec la vraie police (sa mesure n'est fiable qu'alors).
+    const content = page.overlay.querySelector(`[data-id="${anno.id}"] .text-anno__content`);
+    const spec = getComputedStyle(content).font;
+    Promise.resolve(document.fonts.load(spec, blk.lines[0].text || 'a')).catch(() => {}).then(() => {
+      requestAnimationFrame(() => {
+        if (!page.annotations.includes(anno)) return;
+        anno.letterSpacing = spacingToMatch(page, blk, content);
+        renderTextAnno(page, anno);
+      });
+    });
+  }
+
+  // Le canvas pdf.js suit les avances du PDF (crénage, Tc…), le DOM celles de
+  // la police : un léger interlettrage recale la largeur de la plus longue
+  // ligne, mesurée dans le DOM avec les mêmes styles que l'annotation.
+  function spacingToMatch (page, blk, content) {
+    const line = blk.lines.reduce((a, b) => (b.right - b.left > a.right - a.left ? b : a));
+    if (!line.text || line.text.length < 4) return 0;
+    const cs = getComputedStyle(content);
+    const probe = document.createElement('span');
+    probe.textContent = line.text;
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:0;top:0;';
+    probe.style.font = cs.font;
+    probe.style.fontSynthesis = cs.fontSynthesis;
+    page.overlay.appendChild(probe);
+    const natural = probe.getBoundingClientRect().width / (state.zoom || 1);
+    probe.remove();
+    const ls = ((line.right - line.left) - natural) / (line.text.length - 1);
+    const size = parseFloat(cs.fontSize) || 12;
+    return Number.isFinite(ls) ? Math.round(clamp(ls, -size * 0.1, size * 0.1) * 1000) / 1000 : 0;
+  }
+
+  function placeCaretAtPoint (x, y) {
+    let node = null, offset = 0;
+    if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) { node = pos.offsetNode; offset = pos.offset; }
+    } else if (document.caretRangeFromPoint) {
+      const r = document.caretRangeFromPoint(x, y);
+      if (r) { node = r.startContainer; offset = r.startOffset; }
+    }
+    const content = document.activeElement;
+    if (!node || !content?.classList?.contains('text-anno__content') || !content.contains(node)) return;
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
 
   function sourceBlockAt (page, x, y) {
@@ -1396,7 +1476,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       if (e.target.closest('.text-anno, .selection-box, [data-id], .page__delete')) return;
       const { x, y } = pagePoint(e, page);
       const blk = sourceBlockAt(page, x, y);
-      if (blk) { e.preventDefault(); beginSourceTextEdit(page, blk); }
+      if (blk) { e.preventDefault(); beginSourceTextEdit(page, blk, e); }
     });
     bindSelectionHandles(pageIndex);
   }
@@ -1528,7 +1608,10 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     el.style.left = `${anno.x / page.width * 100}%`;
     el.style.top = `${anno.y / page.height * 100}%`;
     el.style.width = `${anno.width / page.width * 100}%`;
-    content.style.fontFamily = anno.font === 'serif' ? 'var(--font-content-serif)' : 'var(--font-content-sans)';
+    content.style.fontFamily = anno.cssFont
+      || (anno.font === 'serif' ? 'var(--font-content-serif)' : 'var(--font-content-sans)');
+    content.style.fontSynthesis = anno.cssFont ? 'none' : '';
+    content.style.letterSpacing = anno.letterSpacing ? `${anno.letterSpacing}px` : '';
     content.style.fontSize = `${anno.size}px`;
     content.style.fontWeight = anno.weight;
     content.style.fontStyle = anno.italic ? 'italic' : 'normal';
@@ -1537,8 +1620,21 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
 
     if (state.editingId !== anno.id) {
       content.textContent = anno.content;
+      anno.baseline = measureBaseline(el, content);
     }
     el.classList.toggle('is-editing', state.editingId === anno.id);
+  }
+
+  // Distance (unités page) entre le haut de la zone de texte et la ligne de
+  // base de sa 1re ligne — sert à l'alignement sur l'original et à l'export.
+  function measureBaseline (el, content) {
+    const probe = document.createElement('span');
+    probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+    content.prepend(probe);
+    const scale = el.offsetWidth ? el.getBoundingClientRect().width / el.offsetWidth : state.zoom;
+    const baseline = (probe.getBoundingClientRect().bottom - el.getBoundingClientRect().top) / (scale || 1);
+    probe.remove();
+    return Number.isFinite(baseline) ? baseline : null;
   }
 
   function startEditing (pageIndex, annoId) {
@@ -1549,6 +1645,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     if (!el) return;
     const content = el.querySelector('.text-anno__content');
     el.classList.add('is-editing');
+    page.el.classList.add('is-text-editing');
     content.setAttribute('contenteditable', 'plaintext-only');
     content.focus();
     const range = document.createRange();
@@ -1582,6 +1679,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const anno = page.annotations.find(a => a.id === state.editingId);
     if (anno) anno.content = content.textContent;
     el.classList.remove('is-editing');
+    page.el.classList.remove('is-text-editing');
     content.removeAttribute('contenteditable');
     state.editingId = null;
 
@@ -2585,6 +2683,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       const page = state.pages[state.selection.pageIndex];
       const el = page?.overlay.querySelector(`[data-id="${state.editingId}"]`);
       el?.classList.remove('is-editing');
+      page?.el.classList.remove('is-text-editing');
       el?.querySelector('.text-anno__content')?.removeAttribute('contenteditable');
       state.editingId = null;
     }

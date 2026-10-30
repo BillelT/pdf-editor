@@ -97,8 +97,9 @@ async function drawTextVector(pdfPage, anno, pdfDoc, fontCache, t) {
   const lines = wrapTextForFont(font, anno.content, maxWidthPt, fontSizePt);
   lines.forEach((line, i) => {
     if (!line) return;
-    const visualBaselineY = anno.y + 2 + i * lineHeightCanvas + ascentPt * scale;
-    const raw = visualToRaw(t, anno.x + 4, visualBaselineY);
+    const firstBaseline = anno.baseline ?? (2 + ascentPt * scale); // mesuré à l'écran (voir app.js)
+    const visualBaselineY = anno.y + firstBaseline + i * lineHeightCanvas;
+    const raw = visualToRaw(t, anno.x + 5, visualBaselineY); // bordure 1 + padding 4
     pdfPage.drawText(line, {
       x: raw.x, y: raw.y,
       size: fontSizePt, font, color: rgb(r, g, b),

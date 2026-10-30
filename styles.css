@@ -32,13 +32,15 @@ body {
   height: 100%;
 }
 
-/* Coquille : pile verticale pleine hauteur, LARGEUR NATURELLE — jamais de
-   width/max-width fixe, seulement un plancher (cf. anti-pattern b-editor). */
+/* Coquille : pile verticale pleine hauteur. Largeur compacte voulue (le
+   canvas prend le reste) : base 17rem, jamais en dessous de 15rem. */
 .editor {
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
   height: 100%;
-  min-width: 20rem;
+  width: 17rem;
+  min-width: 15rem;
   background: var(--b-surface);
   border-right: 1px solid var(--b-border); /* aside à GAUCHE — jamais border-left */
 }
@@ -126,7 +128,7 @@ body {
 }
 
 .editor__actions-row { display: flex; gap: var(--b-space-12); }
-.editor__actions-row > .btn { flex: 1; }
+.editor__actions-row > .btn { flex: 1; min-width: 0; white-space: nowrap; padding-inline: var(--b-space-8); }
 
 /* Footer fixe : statut + crédit (liens obligatoires : marque + compte social) */
 .editor__foot {
@@ -430,6 +432,7 @@ kbd {
    `transform: scale(--zoom)` — voir setZoom() dans app.js. */
 .pages-viewport {
   position: relative;
+  margin-inline: auto; /* centré ; déborde vers la droite seulement (défilable) */
 }
 
 .pages {
@@ -443,7 +446,7 @@ kbd {
 /* ---------- Zoom bar (flottante, bas-droit du canvas) ------------------- */
 
 .zoom-bar {
-  position: absolute;
+  position: fixed;
   right: var(--b-space-24);
   bottom: var(--b-space-24);
   display: flex;
@@ -495,12 +498,17 @@ kbd {
   background: var(--b-surface);
   border-radius: var(--b-radius-sm);
   box-shadow: 0 1px 2px rgba(17, 15, 13, 0.06), 0 8px 24px rgba(17, 15, 13, 0.08);
-  overflow: hidden;
+  /* Comme un artboard Figma : un objet glissé hors de la page reste visible
+     sur le fond du canvas (l'export, lui, reste borné à la page). */
+  overflow: visible;
 }
 
 .page__canvas {
   display: block;
+  border-radius: inherit;
 }
+
+.page__svg { overflow: visible; }
 
 .page__overlay {
   position: absolute;
@@ -633,9 +641,16 @@ kbd {
 .text-anno.is-editing .text-anno__content {
   cursor: text;
   user-select: text;
+  border-style: solid;
   border-color: var(--b-accent);
   background: transparent;
 }
+
+/* Édition sur place : pas de poignées, seulement le caret et le filet. */
+.page.is-text-editing .selection-box { border-color: transparent; }
+.page.is-text-editing .selection-handle,
+.page.is-text-editing .selection-rotate-handle,
+.page.is-text-editing .selection-rotate-stem { display: none; }
 
 .page__overlay--erase .text-anno__content { cursor: cell; }
 .page__overlay--text  .text-anno__content { cursor: text; }
@@ -873,9 +888,12 @@ kbd {
   position: absolute;
   inset: 0;
   display: none;
+  pointer-events: none; /* seuls les blocs captent le clic */
 }
 
-.page__overlay--source-text .src-text-layer { display: block; }
+.page__overlay--source-text .src-text-layer,
+.page__overlay--text .src-text-layer { display: block; }
+.page__overlay--source-text .src-text-item { cursor: cell; }
 .page__overlay--source-text .text-anno.is-editing { pointer-events: auto; }
 
 .src-text-item {
