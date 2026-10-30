@@ -164,14 +164,13 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       p.el.dataset.tool = tool;
     });
     $('status-tool').textContent = `Outil : ${toolLabel(tool)}`;
-    if (tool === 'source-text') state.pages.forEach(p => ensureSourceTextLayer(p));
   }
 
   function toolLabel (t) {
     return {
       select: 'Sélection', text: 'Texte', pen: 'Stylo', erase: 'Gomme',
       rect: 'Rectangle', ellipse: 'Ellipse', line: 'Ligne',
-      'source-text': "Texte d'origine",
+      'source-text': 'Texte du PDF',
     }[t];
   }
 
@@ -209,6 +208,10 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
       if (isMod(e) && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomBy(ZOOM_STEP); return; }
       if (isMod(e) && e.key === '-') { e.preventDefault(); zoomBy(1 / ZOOM_STEP); return; }
       if (isMod(e) && e.key === '0') { e.preventDefault(); setZoom(1); return; }
+      // Raccourcis de vue façon Figma : Maj+0 = 100 %, Maj+1 = tout voir, Maj+2 = sélection.
+      if (!typing && !isMod(e) && e.shiftKey && e.code === 'Digit0') { e.preventDefault(); setZoom(1); return; }
+      if (!typing && !isMod(e) && e.shiftKey && e.code === 'Digit1') { e.preventDefault(); fitPage(); return; }
+      if (!typing && !isMod(e) && e.shiftKey && e.code === 'Digit2') { e.preventDefault(); zoomToSelection(); return; }
 
       if (typing) {
         if (isMod(e) && e.key.toLowerCase() === 'a' && state.editingId) {
@@ -488,6 +491,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
 
     state.zoom = clamped;
     applyZoomLayout();
+    scheduleQualityRender();
 
     zone.scrollLeft = contentX * ratio - (clientX - rect.left);
     zone.scrollTop = contentY * ratio - (clientY - rect.top);
@@ -509,6 +513,36 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     setZoom(clamp(available, MIN_ZOOM, MAX_ZOOM));
   }
 
+  // Largeur de la page courante dans la zone visible (ouverture d'un PDF).
+  function fitWidth () {
+    if (state.pages.length === 0) return;
+    const zone = $('canvas-zone');
+    const natural = pagesNaturalSize();
+    if (!natural.width) return;
+    state.zoom = 1; // repart de 1 pour que setZoom applique le changement
+    setZoom(clamp((zone.clientWidth - 96) / natural.width, MIN_ZOOM, 1.25));
+    zone.scrollTop = 0;
+    zone.scrollLeft = Math.max(0, (zone.scrollWidth - zone.clientWidth) / 2);
+  }
+
+  // Cadre la sélection (Maj+2, comme Figma), sinon la page.
+  function zoomToSelection () {
+    const annos = selectedAnnos();
+    const page = activeSelectionPage();
+    if (!annos.length || !page) { fitPage(); return; }
+    const frame = unionFrames(annos.map(a => getFrame(a, page)));
+    const zone = $('canvas-zone');
+    const z = clamp(Math.min(
+      (zone.clientWidth - 160) / Math.max(frame.width, 40),
+      (zone.clientHeight - 160) / Math.max(frame.height, 40),
+    ), MIN_ZOOM, MAX_ZOOM);
+    setZoom(z);
+    const zr = zone.getBoundingClientRect();
+    const pr = page.el.getBoundingClientRect();
+    zone.scrollLeft += (pr.left + (frame.x + frame.width / 2) * state.zoom) - (zr.left + zr.width / 2);
+    zone.scrollTop += (pr.top + (frame.y + frame.height / 2) * state.zoom) - (zr.top + zr.height / 2);
+  }
+
   function bindZoomBar () {
     $('zoom-in').addEventListener('click', () => zoomBy(ZOOM_STEP));
     $('zoom-out').addEventListener('click', () => zoomBy(1 / ZOOM_STEP));
@@ -522,9 +556,12 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const zone = $('canvas-zone');
 
     zone.addEventListener('wheel', (e) => {
-      if (!e.ctrlKey) return; // trackpad pinch (ou ctrl+molette) — le scroll normal reste natif
+      if (!e.ctrlKey && !e.metaKey) return; // pinch trackpad, Ctrl/Cmd + molette — le scroll normal reste natif
       e.preventDefault();
-      const factor = Math.exp(-e.deltaY * 0.01);
+      // Pinch = petits deltas continus ; une molette crante à ±100 : on borne
+      // pour qu'un cran vaille ~×1,5 et non ×2,7.
+      const dy = clamp(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, -40, 40);
+      const factor = Math.exp(-dy * 0.01);
       setZoom(state.zoom * factor, { clientX: e.clientX, clientY: e.clientY });
     }, { passive: false });
 
@@ -533,7 +570,8 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
         if (state.editingId) commitEditing();
         clearSelection();
       }
-      if (state.spaceHeld && e.button === 0) {
+      if ((state.spaceHeld && e.button === 0) || e.button === 1) {
+        e.preventDefault();
         panSession = { startX: e.clientX, startY: e.clientY, scrollLeft: zone.scrollLeft, scrollTop: zone.scrollTop };
         zone.classList.add('is-panning');
         const onMove = (ev) => {
@@ -606,6 +644,9 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     $('zoom-bar').classList.toggle('is-hidden', state.mode !== 'edit' || state.pages.length === 0);
     applyZoomLayout();
     setTool(state.tool);
+    state.pages.forEach(p => ensureSourceTextLayer(p));
+    requestAnimationFrame(() => fitWidth());
+    scheduleQualityRender();
   }
 
   function visiblePages () {
@@ -639,57 +680,224 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     applyZoomLayout();
   }
 
-  // ---------- Texte d'origine (suppression dans les données du PDF) --------
+  // ---------- Texte d'origine (édition / suppression dans les données du PDF)
+
+  // Les items pdf.js (un par chunk de texte) sont regroupés en blocs : chunks
+  // de la même ligne, puis lignes consécutives alignées de même police. Un
+  // bloc = l'unité que l'on édite ; les lignes « pleines » d'un paragraphe
+  // sont recollées (retour à la ligne souple), les autres gardent leur saut.
+
+  const FONT_WEIGHTS = [
+    [/black|heavy/i, 900], [/extra-?bold|ultra/i, 800], [/semi-?bold|demi/i, 600],
+    [/bold/i, 700], [/medium/i, 500], [/extra-?light|thin/i, 200], [/light/i, 300],
+  ];
+
+  function describeFont (pdfPage, item, styles) {
+    let name = '';
+    try { name = pdfPage.commonObjs.get(item.fontName)?.name || ''; } catch {}
+    const family = styles[item.fontName]?.fontFamily || '';
+    const hay = `${name} ${family}`;
+    const weight = (FONT_WEIGHTS.find(([re]) => re.test(hay)) || [null, 400])[1];
+    const italic = /italic|oblique/i.test(hay);
+    const serif = /zodiak|serif|times|georgia|garamond|minion|playfair|didot|caslon|bodoni/i.test(hay)
+      && !/sans/i.test(hay) && !/^sans/i.test(family);
+    return { weight, italic, font: serif ? 'serif' : 'sans' };
+  }
+
+  function buildTextBlocks (page, content) {
+    const viewport = page.pdfPage.getViewport({ scale: page.scale });
+    const items = [];
+    content.items.forEach((item, idx) => {
+      if (!item.str || !item.str.trim()) return;
+      const box = textItemBox(item);
+      const pts = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]]
+        .map(([x, y]) => viewport.convertToViewportPoint(x, y));
+      const xs = pts.map(c => c[0]);
+      const ys = pts.map(c => c[1]);
+      const [a, b, c, d, , f] = item.transform;
+      const sizePt = Math.hypot(c, d) || Math.hypot(a, b);
+      const base = viewport.convertToViewportPoint(item.transform[4], f);
+      items.push({
+        idx, box, str: item.str, fontName: item.fontName, sizePx: sizePt * page.scale,
+        baseline: base[1],
+        left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys),
+        ...describeFont(page.pdfPage, item, content.styles),
+      });
+    });
+
+    const blocks = [];
+    items.forEach(it => {
+      const sameStyle = (blk) => blk.fontName === it.fontName && Math.abs(blk.sizePx - it.sizePx) < 0.6;
+      for (let k = blocks.length - 1; k >= 0; k--) {
+        const blk = blocks[k];
+        if (!sameStyle(blk)) continue;
+        const last = blk.lines[blk.lines.length - 1];
+        // même ligne : même ligne de base, juste à droite
+        if (Math.abs(last.baseline - it.baseline) < it.sizePx * 0.25 && it.left >= last.right - 2
+          && it.left - last.right < it.sizePx * 0.9) {
+          last.parts.push(it);
+          last.right = it.right;
+          blk.items.push(it);
+          return;
+        }
+        // ligne suivante : en dessous, alignée à gauche
+        const dy = it.baseline - last.baseline;
+        if (dy > it.sizePx * 0.9 && dy < it.sizePx * 2 && Math.abs(it.left - blk.lines[0].left) < it.sizePx * 0.35) {
+          blk.lines.push({ parts: [it], baseline: it.baseline, left: it.left, right: it.right });
+          blk.items.push(it);
+          return;
+        }
+      }
+      blocks.push({
+        id: `b${blocks.length}`, fontName: it.fontName, sizePx: it.sizePx, weight: it.weight,
+        italic: it.italic, font: it.font, items: [it],
+        lines: [{ parts: [it], baseline: it.baseline, left: it.left, right: it.right }],
+      });
+    });
+
+    blocks.forEach(blk => {
+      blk.left = Math.min(...blk.items.map(i => i.left));
+      blk.right = Math.max(...blk.items.map(i => i.right));
+      blk.top = Math.min(...blk.items.map(i => i.top));
+      blk.bottom = Math.max(...blk.items.map(i => i.bottom));
+      const full = blk.right - blk.left;
+      let text = '';
+      blk.lines.forEach((ln, i) => {
+        const lineText = ln.parts.reduce((acc, p, j) => {
+          if (j === 0) return p.str;
+          const gap = p.left - ln.parts[j - 1].right;
+          return acc + (gap > p.sizePx * 0.12 && !/\s$/.test(acc) && !/^\s/.test(p.str) ? ' ' : '') + p.str;
+        }, '');
+        if (i === 0) { text = lineText; return; }
+        const prev = blk.lines[i - 1];
+        text += ((prev.right - blk.left) >= full * 0.9 ? ' ' : '\n') + lineText;
+      });
+      blk.text = text;
+      blk.lineHeight = blk.lines.length > 1
+        ? (blk.lines[blk.lines.length - 1].baseline - blk.lines[0].baseline) / (blk.lines.length - 1) / blk.sizePx
+        : 1.3;
+    });
+    return blocks;
+  }
+
+  // Couleur de fond (médiane des pixels juste autour) et de texte (pixel le
+  // plus éloigné du fond) d'une zone du rendu courant.
+  function sampleColors (page, rect) {
+    const q = page.quality || 1;
+    const W = page.canvas.width, H = page.canvas.height;
+    const x0 = clamp(Math.floor((rect.left - 3) * q), 0, W - 1);
+    const x1 = clamp(Math.ceil((rect.right + 3) * q), 1, W);
+    const y0 = clamp(Math.floor(rect.top * q), 0, H - 1);
+    const y1 = clamp(Math.ceil(rect.bottom * q), 1, H);
+    try {
+      const data = page.ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+      const w = data.width, h = data.height, px = data.data;
+      const ring = [];
+      const at = (x, y) => { const o = (y * w + x) * 4; return [px[o], px[o + 1], px[o + 2]]; };
+      for (let y = 0; y < h; y++) { ring.push(at(0, y), at(w - 1, y)); }
+      for (let x = 0; x < w; x++) { ring.push(at(x, 0), at(x, h - 1)); }
+      const med = (ch) => ring.map(c => c[ch]).sort((a, b) => a - b)[Math.floor(ring.length / 2)];
+      const bg = [med(0), med(1), med(2)];
+      let best = bg, bestD = -1;
+      for (let i = 0; i < px.length; i += 4) {
+        const d = (px[i] - bg[0]) ** 2 + (px[i + 1] - bg[1]) ** 2 + (px[i + 2] - bg[2]) ** 2;
+        if (d > bestD) { bestD = d; best = [px[i], px[i + 1], px[i + 2]]; }
+      }
+      const hex = (c) => `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`;
+      return { bg: bg.map(v => v / 255), color: bestD > 400 ? hex(best) : hex([0, 0, 0]) };
+    } catch {
+      return { bg: [1, 1, 1], color: '#000000' };
+    }
+  }
 
   async function ensureSourceTextLayer (page) {
-    if (!page.pdfPage || page.textLayer) return;
+    if (!page.pdfPage || page.textBlocks || page.textLoading) return;
+    page.textLoading = true;
     const layer = document.createElement('div');
     layer.className = 'src-text-layer';
     page.textLayer = layer;
     page.overlay.prepend(layer);
 
     const content = await page.pdfPage.getTextContent();
-    const viewport = page.pdfPage.getViewport({ scale: page.scale });
-    page.textItems = [];
-    content.items.forEach((item, idx) => {
-      if (!item.str || !item.str.trim()) return;
-      const box = textItemBox(item);
-      const corners = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]]
-        .map(([x, y]) => viewport.convertToViewportPoint(x, y));
-      const xs = corners.map(c => c[0]);
-      const ys = corners.map(c => c[1]);
+    page.textBlocks = buildTextBlocks(page, content);
+    page.textBlocks.forEach(blk => {
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'src-text-item';
-      el.title = `Supprimer « ${item.str} »`;
-      el.dataset.idx = idx;
-      el.style.left = `${Math.min(...xs)}px`;
-      el.style.top = `${Math.min(...ys)}px`;
-      el.style.width = `${Math.max(...xs) - Math.min(...xs)}px`;
-      el.style.height = `${Math.max(...ys) - Math.min(...ys)}px`;
+      el.title = `Modifier « ${blk.text.replace(/\s+/g, ' ').slice(0, 60)} »`;
+      el.setAttribute('aria-label', `Modifier le texte : ${blk.text.replace(/\s+/g, ' ').slice(0, 60)}`);
+      el.style.left = `${blk.left - 2}px`;
+      el.style.top = `${blk.top - 1}px`;
+      el.style.width = `${blk.right - blk.left + 4}px`;
+      el.style.height = `${blk.bottom - blk.top + 2}px`;
       el.addEventListener('pointerdown', e => e.stopPropagation());
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        removeSourceTextItem(page, idx, box);
+      el.addEventListener('pointerenter', () => el.focus({ preventScroll: true }));
+      el.addEventListener('click', e => { e.stopPropagation(); beginSourceTextEdit(page, blk); });
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          e.stopPropagation();
+          removeSourceTextBlock(page, blk);
+        }
       });
+      blk.el = el;
       layer.appendChild(el);
-      page.textItems.push({ idx, box, el });
     });
+    page.textLoading = false;
     refreshSourceTextLayer(page);
+  }
+
+  function blockRemoved (page, blk) {
+    return blk.items.every(it => page.removedText.some(r => r.idx === it.idx));
   }
 
   function refreshSourceTextLayer (page) {
-    if (!page.textItems) return;
-    const removed = new Set(page.removedText.map(r => r.idx));
-    page.textItems.forEach(t => { t.el.hidden = removed.has(t.idx); });
+    if (!page.textBlocks) return;
+    page.textBlocks.forEach(blk => { blk.el.hidden = blockRemoved(page, blk); });
   }
 
-  function removeSourceTextItem (page, idx, box) {
-    if (page.removedText.some(r => r.idx === idx)) return;
-    pushHistory();
-    page.removedText = [...page.removedText, { idx, box }];
+  function removeSourceTextBlock (page, blk, { history = true } = {}) {
+    if (blockRemoved(page, blk)) return;
+    if (history) pushHistory();
+    const { bg, color } = sampleColors(page, blk);
+    blk.color = color;
+    const fresh = blk.items
+      .filter(it => !page.removedText.some(r => r.idx === it.idx))
+      .map(it => ({ idx: it.idx, box: { ...it.box, bg } }));
+    page.removedText = [...page.removedText, ...fresh];
     refreshSourceTextLayer(page);
     rerenderSourcePage(page);
+  }
+
+  // Remplace un bloc du PDF par une annotation texte éditable de même
+  // apparence : le texte d'origine quitte le flux PDF, l'annotation prend le
+  // relais (déplaçable, restylable, exportée en texte vectoriel).
+  function beginSourceTextEdit (page, blk, caretPoint) {
+    if (state.editingId) commitEditing();
+    const pageIndex = state.pages.indexOf(page);
+    state.activePageIndex = pageIndex;
+    setTool('select');
+    pushHistory();
+    removeSourceTextBlock(page, blk, { history: false });
+
+    const anno = {
+      id: uid(), type: 'text',
+      x: blk.left - 5, y: blk.top - 3 - Math.max(0, (blk.lineHeight - 1.15) * blk.sizePx / 2),
+      width: Math.max(MIN_TEXT_WIDTH, blk.right - blk.left + 10 + blk.sizePx * 1.5),
+      content: blk.text, font: blk.font, size: Math.round(blk.sizePx * 10) / 10,
+      weight: blk.weight, italic: blk.italic, color: blk.color || '#110f0d',
+      lineHeight: Math.round(clamp(blk.lineHeight, 1, 2.2) * 100) / 100,
+    };
+    page.annotations.push(anno);
+    renderTextAnno(page, anno);
+    selectOnly(pageIndex, anno.id);
+    startEditing(pageIndex, anno.id);
+  }
+
+  function sourceBlockAt (page, x, y) {
+    if (!page.textBlocks) return null;
+    return page.textBlocks.find(b => !blockRemoved(page, b)
+      && x >= b.left - 3 && x <= b.right + 3 && y >= b.top - 2 && y <= b.bottom + 2) || null;
   }
 
   async function getSourceLibDoc () {
@@ -699,31 +907,72 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     return sourceLibDoc;
   }
 
-  // Re-rend le fond de la page à partir du PDF source modifié (texte retiré),
-  // dans un canvas hors écran pour éviter le clignotement.
-  async function rerenderSourcePage (page) {
-    if (!page.pdfPage) return;
+  // Re-rend le fond de la page (PDF source, texte retiré) à la résolution
+  // `page.quality`, dans un canvas hors écran pour éviter le clignotement.
+  async function rerenderSourcePage (page, quality = page.quality || 1) {
     const token = (page.renderToken = (page.renderToken || 0) + 1);
-    let pdfPage = page.pdfPage;
-    let tmpDoc = null;
-    if (page.removedText.length) {
-      const { PDFDocument } = window.PDFLib;
-      const one = await PDFDocument.create();
-      const [copied] = await one.copyPages(await getSourceLibDoc(), [page.srcIndex]);
-      one.addPage(copied);
-      removeSourceText(one, one.getPage(0), page.removedText.map(r => r.box));
-      tmpDoc = await window.pdfjsLib.getDocument({ data: await one.save() }).promise;
-      pdfPage = await tmpDoc.getPage(1);
-    }
-    const viewport = pdfPage.getViewport({ scale: page.scale });
+    const w = Math.round(page.width * quality);
+    const h = Math.round(page.height * quality);
     const off = document.createElement('canvas');
-    off.width = page.canvas.width;
-    off.height = page.canvas.height;
-    await pdfPage.render({ canvasContext: off.getContext('2d'), viewport }).promise;
-    tmpDoc?.destroy();
+    off.width = w;
+    off.height = h;
+    const offCtx = off.getContext('2d');
+
+    if (!page.pdfPage) {
+      offCtx.fillStyle = '#ffffff';
+      offCtx.fillRect(0, 0, w, h);
+    } else {
+      let pdfPage = page.pdfPage;
+      let tmpDoc = null;
+      if (page.removedText.length) {
+        const { PDFDocument } = window.PDFLib;
+        const one = await PDFDocument.create();
+        const [copied] = await one.copyPages(await getSourceLibDoc(), [page.srcIndex]);
+        one.addPage(copied);
+        removeSourceText(one, one.getPage(0), page.removedText.map(r => r.box));
+        tmpDoc = await window.pdfjsLib.getDocument({ data: await one.save() }).promise;
+        pdfPage = await tmpDoc.getPage(1);
+      }
+      const viewport = pdfPage.getViewport({ scale: page.scale * quality });
+      await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
+      tmpDoc?.destroy();
+    }
     if (token !== page.renderToken) return;
-    page.ctx.clearRect(0, 0, page.canvas.width, page.canvas.height);
+    page.quality = quality;
+    if (page.canvas.width !== w || page.canvas.height !== h) {
+      page.canvas.width = w;
+      page.canvas.height = h;
+    } else {
+      page.ctx.clearRect(0, 0, w, h);
+    }
     page.ctx.drawImage(off, 0, 0);
+  }
+
+  // Netteté au zoom : une fois le zoom stabilisé, les pages visibles sont
+  // re-rendues à la résolution écran réelle (plafonnée) ; les autres
+  // retombent à 1× pour économiser la mémoire.
+  const MAX_CANVAS_PIXELS = 24e6;
+  let qualityTimer = null;
+
+  function scheduleQualityRender () {
+    clearTimeout(qualityTimer);
+    qualityTimer = setTimeout(refreshPageQuality, 160);
+  }
+
+  function refreshPageQuality () {
+    const zone = $('canvas-zone');
+    const zr = zone.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    state.pages.forEach(page => {
+      if (page.deleted) return;
+      const r = page.el.getBoundingClientRect();
+      const visible = r.bottom > zr.top - 200 && r.top < zr.bottom + 200 && r.right > zr.left && r.left < zr.right;
+      let q = visible ? Math.max(1, Math.round(state.zoom * dpr * 2) / 2) : 1;
+      q = Math.min(q, 4, Math.sqrt(MAX_CANVAS_PIXELS / (page.width * page.height)));
+      q = Math.max(1, Math.floor(q * 2) / 2);
+      if (Math.abs(q - (page.quality || 1)) < 0.01) return;
+      rerenderSourcePage(page, q);
+    });
   }
 
   // ---------- Fusion de PDF ------------------------------------------------
@@ -1054,6 +1303,8 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const canvas = pageEl.querySelector('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
     const ctx = canvas.getContext('2d');
 
     await pdfPage.render({ canvasContext: ctx, viewport }).promise;
@@ -1071,6 +1322,8 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const canvas = pageEl.querySelector('canvas');
     canvas.width = width;
     canvas.height = height;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
@@ -1086,6 +1339,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     const page = {
       ...base,
       annotations: [],
+      quality: 1,         // résolution du canvas (× taille CSS) — voir scheduleQualityRender
       removedText: [],    // [{ idx, box }] — texte d'origine retiré (voir source-text.js)
       deleted: false,
       overlay: pageEl.querySelector('.page__overlay'),
@@ -1136,6 +1390,14 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     // page" remontent ici par bubbling puisque tout élément plus
     // spécifique (texte, shape, poignée) appelle stopPropagation().
     page.el.addEventListener('pointerdown', e => onPagePointerDown(e, pageIndex));
+    // Double-clic sur du texte d'origine du PDF (en sélection) : on l'édite.
+    page.el.addEventListener('dblclick', e => {
+      if (state.tool !== 'select' || state.spaceHeld) return;
+      if (e.target.closest('.text-anno, .selection-box, [data-id], .page__delete')) return;
+      const { x, y } = pagePoint(e, page);
+      const blk = sourceBlockAt(page, x, y);
+      if (blk) { e.preventDefault(); beginSourceTextEdit(page, blk); }
+    });
     bindSelectionHandles(pageIndex);
   }
 
@@ -1270,6 +1532,7 @@ import { removeSourceText, textItemBox } from './editor/source-text.js';
     content.style.fontSize = `${anno.size}px`;
     content.style.fontWeight = anno.weight;
     content.style.fontStyle = anno.italic ? 'italic' : 'normal';
+    content.style.lineHeight = anno.lineHeight ? String(anno.lineHeight) : '';
     content.style.color = anno.color;
 
     if (state.editingId !== anno.id) {

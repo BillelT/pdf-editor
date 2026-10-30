@@ -14,8 +14,13 @@
    même ligne sans repositionnement explicite, l'opération supprimée est
    gardée en mode invisible (3 Tr) pour ne pas décaler la suite.
 
-   Filet de sécurité : une boîte qui ne correspond à aucune opération (texte
-   dans un Form XObject, flux exotique…) est recouverte d'un rectangle blanc.
+   Les Form XObjects (`Do`) sont parcourus récursivement — les exports Figma /
+   Skia y rangent volontiers le texte des groupes clippés — et leur flux est
+   réécrit sur place (on travaille toujours sur une copie du document).
+
+   Filet de sécurité : une boîte qui ne correspond à aucune opération (flux
+   exotique…) est recouverte d'un aplat de la couleur de fond échantillonnée
+   sur le rendu (`box.bg`, blanc par défaut) — jamais d'un blanc forcé.
 ============================================================================= */
 
 const WS = new Set([0x00, 0x09, 0x0a, 0x0c, 0x0d, 0x20]);
@@ -139,7 +144,7 @@ const nums = (operands) => operands.map(o => o.value);
 const SHOW_OPS = new Set(['Tj', 'TJ', "'", '"']);
 const LINE_OPS = new Set(['BT', 'ET', 'Tm', 'Td', 'TD', 'T*', "'", '"']);
 
-function inBox(p, boxes, tol = 1) {
+function inBox(p, boxes, tol = 2) {
   for (let k = 0; k < boxes.length; k++) {
     const b = boxes[k];
     if (p.x >= b.x0 - tol && p.x <= b.x1 + tol && p.y >= b.y0 - tol && p.y <= b.y1 + tol) return k;
@@ -148,11 +153,12 @@ function inBox(p, boxes, tol = 1) {
 }
 
 // Renvoie { bytes, hits } : flux réécrit + indices des boîtes touchées.
-function stripTextFromContent(bytes, boxes) {
+// `hits` est partagé avec les appels récursifs ; `onForm(name, ctm)` est
+// appelé pour chaque `Do` afin de traiter les Form XObjects.
+function stripTextFromContent(bytes, boxes, ctm0 = ID, hits = new Set(), onForm = null) {
   const ops = parseOperations(bytes);
-  let ctm = ID, tm = ID, tlm = ID, tl = 0, fs = 0, tz = 1, tr = 0;
+  let ctm = ctm0, tm = ID, tlm = ID, tl = 0, fs = 0, tz = 1, tr = 0;
   const stack = [];
-  const hits = new Set();
   const shows = []; // { idx, remove }
 
   ops.forEach((o, idx) => {
@@ -170,6 +176,7 @@ function stripTextFromContent(bytes, boxes) {
       case 'Tf': if (a.length === 2) fs = a[1].value; break;
       case 'Tz': if (a.length) tz = a[0].value / 100; break;
       case 'Tr': if (a.length) tr = a[0].value; break;
+      case 'Do': if (onForm && a.length === 1 && a[0].type === 'name') onForm(a[0].value.slice(1), ctm); break;
     }
     if (!SHOW_OPS.has(o.op)) return;
     if (o.op === "'" || o.op === '"') tm = tlm = mul([1, 0, 0, 1, 0, -tl], tlm);
@@ -190,7 +197,7 @@ function stripTextFromContent(bytes, boxes) {
     tm = mul([1, 0, 0, 1, adv * tz, 0], tm);
   });
 
-  if (!shows.some(s => s.remove)) return { bytes, hits };
+  if (!shows.some(s => s.remove)) return { bytes, hits, changed: false };
 
   // Une opération supprimée suivie, sur la même ligne, d'une opération
   // conservée → mode invisible plutôt que retrait (garde l'avance).
@@ -230,18 +237,23 @@ function stripTextFromContent(bytes, boxes) {
   const out = new Uint8Array(total);
   let off = 0;
   parts.forEach(p => { out.set(p, off); off += p.length; });
-  return { bytes: out, hits };
+  return { bytes: out, hits, changed: true };
+}
+
+function decodeStream(stream) {
+  const { PDFRawStream, decodePDFRawStream } = window.PDFLib;
+  return stream instanceof PDFRawStream ? decodePDFRawStream(stream).decode() : stream.getContents();
 }
 
 function readPageContent(pdfDoc, pdfPage) {
-  const { PDFArray, PDFRawStream, decodePDFRawStream } = window.PDFLib;
+  const { PDFArray } = window.PDFLib;
   const ctx = pdfDoc.context;
   const contents = pdfPage.node.Contents();
   if (!contents) return new Uint8Array(0);
   const streams = contents instanceof PDFArray
     ? contents.asArray().map(r => ctx.lookup(r))
     : [contents];
-  const chunks = streams.map(s => (s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents()));
+  const chunks = streams.map(decodeStream);
   const total = chunks.reduce((t, c) => t + c.length + 1, 0);
   const out = new Uint8Array(total);
   let off = 0;
@@ -249,21 +261,77 @@ function readPageContent(pdfDoc, pdfPage) {
   return out;
 }
 
+// Ressources de la page, héritage /Parent compris.
+function pageResources(pdfPage) {
+  const { PDFName, PDFDict } = window.PDFLib;
+  let node = pdfPage.node;
+  for (let depth = 0; node && depth < 16; depth++) {
+    const res = node.lookupMaybe(PDFName.of('Resources'), PDFDict);
+    if (res) return res;
+    node = node.lookupMaybe(PDFName.of('Parent'), PDFDict);
+  }
+  return null;
+}
+
+function numbersOf(arr) {
+  if (!arr) return null;
+  const out = arr.asArray().map(o => (typeof o.asNumber === 'function' ? o.asNumber() : NaN));
+  return out.length === 6 && out.every(Number.isFinite) ? out : null;
+}
+
+// Réécrit (récursivement) le texte des Form XObjects appelés depuis un flux.
+function makeFormHandler(pdfDoc, resources, boxes, hits, depth, seen) {
+  const { PDFName, PDFDict, PDFArray, PDFRef } = window.PDFLib;
+  const ctx = pdfDoc.context;
+  return (name, ctm) => {
+    if (depth > 8 || !resources) return;
+    const xobjects = resources.lookupMaybe(PDFName.of('XObject'), PDFDict);
+    const ref = xobjects?.get(PDFName.of(name));
+    if (!(ref instanceof PDFRef)) return;
+    const form = ctx.lookup(ref);
+    const dict = form?.dict;
+    if (!dict || dict.get(PDFName.of('Subtype')) !== PDFName.of('Form')) return;
+
+    const matrix = numbersOf(dict.lookupMaybe(PDFName.of('Matrix'), PDFArray)) || ID;
+    const formCtm = mul(matrix, ctm);
+    const key = `${ref.tag}|${formCtm.map(n => n.toFixed(3)).join(',')}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const inner = dict.lookupMaybe(PDFName.of('Resources'), PDFDict) || resources;
+    const handler = makeFormHandler(pdfDoc, inner, boxes, hits, depth + 1, seen);
+    const res = stripTextFromContent(decodeStream(form), boxes, formCtm, hits, handler);
+    if (!res.changed) return;
+
+    const entries = {};
+    dict.entries().forEach(([k, v]) => {
+      const n = k.asString();
+      if (n === '/Length' || n === '/Filter' || n === '/DecodeParms') return;
+      entries[n.slice(1)] = v;
+    });
+    ctx.assign(ref, ctx.flateStream(res.bytes, entries));
+  };
+}
+
 /**
  * Retire du flux de contenu de pdfPage (page pdf-lib de pdfDoc) le texte
  * dont l'origine tombe dans l'une des boîtes (espace utilisateur PDF :
- * { x0, y0, x1, y1 }). Les boîtes sans correspondance sont recouvertes.
+ * { x0, y0, x1, y1, bg? }). Les boîtes sans correspondance sont recouvertes
+ * d'un aplat de `bg` ([r,g,b] 0..1, blanc par défaut).
  */
 export function removeSourceText(pdfDoc, pdfPage, boxes) {
   if (!boxes || boxes.length === 0) return;
   const { PDFName } = window.PDFLib;
   const original = readPageContent(pdfDoc, pdfPage);
-  const { bytes, hits } = stripTextFromContent(original, boxes);
+  const hits = new Set();
+  const handler = makeFormHandler(pdfDoc, pageResources(pdfPage), boxes, hits, 0, new Set());
+  const { bytes } = stripTextFromContent(original, boxes, ID, hits, handler);
 
   let tail = '';
   boxes.forEach((b, k) => {
     if (hits.has(k)) return;
-    tail += `\nq 1 1 1 rg ${b.x0} ${b.y0} ${b.x1 - b.x0} ${b.y1 - b.y0} re f Q`;
+    const [r, g, bl] = (b.bg || [1, 1, 1]).map(v => +v.toFixed(4));
+    tail += `\nq ${r} ${g} ${bl} rg ${b.x0} ${b.y0} ${b.x1 - b.x0} ${b.y1 - b.y0} re f Q`;
   });
 
   // On réécrit le contenu en un seul flux, enveloppé dans q/Q pour qu'un

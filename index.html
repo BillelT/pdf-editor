@@ -67,7 +67,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/></svg>
             <span class="tool-btn__kbd">L</span>
           </button>
-          <button class="tool-btn" data-tool="source-text" title="Supprimer du texte d'origine (X)">
+          <button class="tool-btn" data-tool="source-text" title="Modifier le texte du PDF (X)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h10v2"/><path d="M9 5v12"/><path d="M7 17h4"/><path d="M15 13l6 6"/><path d="M21 13l-6 6"/></svg>
             <span class="tool-btn__kbd">X</span>
           </button>
@@ -158,8 +158,9 @@
 
       <!-- Panel contextuel : Texte d'origine -->
       <section class="editor__section is-hidden" id="panel-source-text">
-        <h2 class="editor__label">Texte d'origine</h2>
-        <p class="panel__hint">Clique sur un texte du PDF importé pour le supprimer. Il est retiré des données du fichier (plus copiable ni recherchable), pas seulement masqué. <kbd>⌘</kbd>+<kbd>Z</kbd> pour annuler.</p>
+        <h2 class="editor__label">Texte du PDF</h2>
+        <p class="panel__hint">Clique sur un texte du PDF importé pour le modifier : il devient un bloc éditable de même police, taille et couleur. Vide le bloc, ou survole-le puis <kbd>⌫</kbd>, pour le supprimer. L'original est retiré des données du fichier (plus copiable ni recherchable), pas seulement masqué.</p>
+        <p class="panel__hint">En sélection, un double-clic sur un texte fait la même chose. <kbd>⌘</kbd>+<kbd>Z</kbd> pour annuler.</p>
         <p class="panel__hint">Pour retirer une page entière, survole-la et clique sur la corbeille en haut à droite.</p>
       </section>
 
@@ -293,7 +294,7 @@
               <li><kbd>R</kbd> Rectangle</li>
               <li><kbd>O</kbd> Ellipse</li>
               <li><kbd>L</kbd> Ligne</li>
-              <li><kbd>X</kbd> Texte d'origine</li>
+              <li><kbd>X</kbd> Texte du PDF</li>
               <li><kbd>⌫</kbd> Supprimer</li>
               <li><kbd>⌘</kbd>+<kbd>D</kbd> Dupliquer</li>
               <li><kbd>⌘</kbd>+<kbd>C</kbd>/<kbd>V</kbd> Copier/coller</li>
@@ -302,7 +303,12 @@
               <li><kbd>⌥</kbd>+glisser Dupliquer en déplaçant</li>
               <li><kbd>⇧</kbd>+glisser Contraindre l'axe</li>
               <li><kbd>Espace</kbd>+glisser Déplacer la vue</li>
-              <li><kbd>⌘</kbd>+<kbd>0</kbd> Zoom 100 %</li>
+              <li><kbd>⌘</kbd>+molette / pincer Zoom</li>
+              <li><kbd>⇧</kbd>+<kbd>1</kbd> Tout voir</li>
+              <li><kbd>⇧</kbd>+<kbd>2</kbd> Zoom sur la sélection</li>
+              <li><kbd>⌘</kbd>+<kbd>0</kbd> / <kbd>⇧</kbd>+<kbd>0</kbd> Zoom 100 %</li>
+              <li>Clic molette+glisser Déplacer la vue</li>
+              <li>Double-clic sur un texte du PDF Le modifier</li>
             </ul>
           </div>
         </div>

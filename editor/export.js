@@ -90,7 +90,7 @@ async function drawTextVector(pdfPage, anno, pdfDoc, fontCache, t) {
   const scale = t.scale;
   const fontSizePt = anno.size / scale;
   const maxWidthPt = anno.width / scale;
-  const lineHeightCanvas = anno.size * 1.3;
+  const lineHeightCanvas = anno.size * (anno.lineHeight || 1.3);
   const ascentPt = font.heightAtSize(fontSizePt, { descender: false });
   const [r, g, b] = hexToRgb01(anno.color);
 

@@ -470,7 +470,7 @@ kbd {
   border-radius: var(--b-radius-sm);
   font-size: var(--b-text-sm);
   font-family: var(--b-font-mono);
-  cursor: pointer;
+  cursor: text;
   transition: background-color var(--b-duration-fast) var(--b-ease);
 }
 
@@ -634,7 +634,7 @@ kbd {
   cursor: text;
   user-select: text;
   border-color: var(--b-accent);
-  background: color-mix(in srgb, var(--b-white) 50%, transparent);
+  background: transparent;
 }
 
 .page__overlay--erase .text-anno__content { cursor: cell; }
@@ -876,6 +876,7 @@ kbd {
 }
 
 .page__overlay--source-text .src-text-layer { display: block; }
+.page__overlay--source-text .text-anno.is-editing { pointer-events: auto; }
 
 .src-text-item {
   position: absolute;
@@ -883,7 +884,7 @@ kbd {
   background: transparent;
   border-radius: 2px;
   pointer-events: auto;
-  cursor: pointer;
+  cursor: text;
   transition: background-color var(--b-duration-fast) var(--b-ease);
 }
 
